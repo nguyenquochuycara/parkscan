@@ -2160,14 +2160,20 @@ function saveSets(){
   else if(sq&&!sa){ showToast('Enter an answer for your security question','err'); return; }
   if(pa||pc||sq) ls.s('ps_cred',creds);
   document.getElementById('save-btn').disabled=true;
-  renderSets(); showToast('✅ Settings saved!','ok');
+  renderSets();
+  renderActive();  // recalculate running fees with new rates immediately
+  renderDash();    // update dashboard totals
+  showToast('✅ Settings saved!','ok');
 }
 function resetDefs(){
   if(!confirm('Reset settings & passwords to defaults?')) return;
   cfg={...DEF_CFG}; pend={...DEF_CFG}; creds={...DEF_CRED};
   ls.s('ps_cfg',cfg); ls.s('ps_cred',creds);
   document.getElementById('save-btn').disabled=true;
-  renderSets(); showToast('Reset to defaults','ok');
+  renderSets();
+  renderActive();
+  renderDash();
+  showToast('Reset to defaults','ok');
 }
 
 
