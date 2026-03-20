@@ -67,11 +67,18 @@ header{background:var(--surface);padding:10px 15px 9px;border-bottom:1px solid v
 #video{width:100%;height:100%;object-fit:cover;display:block}
 #canvas{display:none}
 .cam-ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
-.pf{width:72%;height:22%;border:2px solid var(--amber);border-radius:6px;position:relative}
-.pf::before,.pf::after{content:'';position:absolute;width:12px;height:12px;border-color:var(--amber);border-style:solid}
-.pf::before{top:-2px;left:-2px;border-width:2px 0 0 2px}
-.pf::after{bottom:-2px;right:-2px;border-width:0 2px 2px 0}
-.cam-lbl{margin-top:10px;font-size:11px;color:rgba(245,166,35,.85);letter-spacing:1px;text-transform:uppercase;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:20px}
+.pf{
+  width:85%;height:30%;
+  border:3px solid var(--amber);border-radius:8px;position:relative;
+  box-shadow:0 0 0 9999px rgba(0,0,0,0.45);
+}
+.pf::before,.pf::after{content:'';position:absolute;width:18px;height:18px;border-color:var(--amber);border-style:solid}
+.pf::before{top:-3px;left:-3px;border-width:3px 0 0 3px;border-radius:4px 0 0 0}
+.pf::after{bottom:-3px;right:-3px;border-width:0 3px 3px 0;border-radius:0 0 4px 0}
+.pf-tl,.pf-br{display:none}
+.pf-scan{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--amber),transparent);animation:scan 1.6s ease-in-out infinite;top:0}
+@keyframes scan{0%{top:0;opacity:1}45%{top:calc(100% - 2px);opacity:1}50%{opacity:0}51%{top:0;opacity:0}55%{opacity:1}100%{top:0;opacity:1}}
+.cam-lbl{margin-top:10px;font-size:13px;font-weight:600;color:#fff;letter-spacing:1.5px;text-transform:uppercase;background:rgba(245,166,35,.85);padding:5px 14px;border-radius:20px}
 .cam-ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:var(--surface2)}
 .cam-ph .ico{font-size:40px}
 .cam-ph p{font-size:13px;color:var(--muted)}
@@ -349,9 +356,9 @@ select.fi option{background:var(--surface2)}
   <div class="msh" style="padding:22px 18px calc(22px + var(--sb))">
     <div class="mh"></div>
     <div class="mt">Reset Admin Password</div>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.5">Master code: <code style="background:var(--surface2);padding:2px 7px;border-radius:4px;border:1px solid var(--border);font-size:12px">PARKSCAN</code></p>
-    <div class="lbl">Master Code</div>
-    <input class="l-inp" id="rec-code" type="text" placeholder="PARKSCAN" style="text-transform:uppercase;letter-spacing:2px;font-family:'DM Mono',monospace">
+    <p id="rec-question-label" style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.5"></p>
+    <div class="lbl">Your Answer</div>
+    <input class="l-inp" id="rec-answer" type="text" placeholder="Enter your answer">
     <div class="lbl">New Admin Password</div>
     <div class="pwd-wrap" style="margin-bottom:10px;position:relative">
       <input class="l-inp" id="rec-pwd" type="password" placeholder="Min 4 characters" style="margin-bottom:0;padding-right:40px">
@@ -396,7 +403,7 @@ select.fi option{background:var(--surface2)}
       <canvas id="canvas"></canvas>
       <img id="preview" class="prev-img">
       <div class="cam-ph" id="cam-ph"><div class="ico">📸</div><p>Tap Start Camera</p></div>
-      <div class="cam-ov" id="cam-ov" style="display:none"><div class="pf"></div><div class="cam-lbl">Align plate here</div></div>
+      <div class="cam-ov" id="cam-ov" style="display:none"><div class="pf"><div class="pf-scan"></div></div><div class="cam-lbl">Align plate here</div></div>
     </div>
     <div class="cam-btns">
       <button class="btn btn-out"   id="btn-tog" onclick="togCam()">▶ Start Camera</button>
@@ -525,6 +532,26 @@ select.fi option{background:var(--surface2)}
             </div>
           </div>
         </div>
+        <div class="srow" style="flex-direction:column;align-items:stretch;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="sr-ico">🔐</div>
+            <div class="sr-inf"><div class="sr-n">Security Question</div><div class="sr-d">Used if admin password is forgotten</div></div>
+          </div>
+          <select class="fi-sm" id="sec-q" oninput="dirty()" style="font-size:13px">
+            <option value="">— Choose a question —</option>
+            <option value="What is your mother's maiden name?">What is your mother's maiden name?</option>
+            <option value="What was the name of your first pet?">What was the name of your first pet?</option>
+            <option value="What city were you born in?">What city were you born in?</option>
+            <option value="What is your favourite food?">What is your favourite food?</option>
+            <option value="What was your childhood nickname?">What was your childhood nickname?</option>
+            <option value="What is the name of your parking lot?">What is the name of your parking lot?</option>
+          </select>
+          <div class="pwd-wrap" style="width:100%">
+            <input class="fi-sm" id="sec-a" type="password" placeholder="Your answer (case-insensitive)" oninput="dirty()" style="padding-right:36px">
+            <button class="eye-btn" onclick="togEye('sec-a',this)" type="button" style="right:8px">👁</button>
+          </div>
+          <div id="sec-current" style="font-size:11px;color:var(--muted)"></div>
+        </div>
       </div>
     </div>
 
@@ -615,7 +642,7 @@ select.fi option{background:var(--surface2)}
         <div class="co-cam-badge" id="co-cam-badge" style="display:none">PHOTO CAPTURED</div>
         <!-- plate frame overlay -->
         <div id="co-cam-frame" style="display:none;position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center">
-          <div class="pf"></div>
+          <div class="pf"><div class="pf-scan"></div></div>
           <div class="cam-lbl">Align plate here</div>
         </div>
       </div>
@@ -770,9 +797,8 @@ select.fi option{background:var(--surface2)}
 // ═══════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════
-const MASTER_CODE   = 'PARKSCAN';
 const DEF_CFG       = {feeCar:5000, feeMoto:2500};
-const DEF_CRED      = {admin:'admin123', checkpoint:'check123'};
+const DEF_CRED      = {admin:'admin123', checkpoint:'check123', secQ:'', secA:''};
 const PERMS = {
   admin:      {active:1,records:1,reports:1,settings:1,seeFee:1,editPlate:1,exportExcel:1},
   checkpoint: {active:1,records:0,reports:1,settings:0,seeFee:1,editPlate:1,exportExcel:1}
@@ -850,12 +876,29 @@ function applyPerms(){
 function showLO(){ document.getElementById('lo-modal').classList.add('open'); }
 function closeLO(){ document.getElementById('lo-modal').classList.remove('open'); }
 function doLogout(){ role=null; stopCam(); stopExitCamSilent(); closeLO(); document.getElementById('app').style.display='none'; document.getElementById('login-screen').style.display='flex'; document.getElementById('l-pwd').value=''; document.getElementById('l-err').textContent=''; goTab('scan'); }
-function openRecover(){ document.getElementById('rec-code').value=''; document.getElementById('rec-pwd').value=''; document.getElementById('rec-err').textContent=''; document.getElementById('recover-screen').classList.add('open'); }
+function openRecover(){
+  document.getElementById('rec-answer').value='';
+  document.getElementById('rec-pwd').value='';
+  document.getElementById('rec-err').textContent='';
+  const q=creds.secQ||'';
+  const lbl=document.getElementById('rec-question-label');
+  if(!q){
+    lbl.innerHTML='<span style="color:var(--amber)">⚠️ No security question set.</span><br>Go to Settings → Passwords to set one first, or contact your admin.';
+    document.getElementById('rec-answer').style.display='none';
+  } else {
+    lbl.innerHTML='Answer your security question to reset the password:';
+    document.getElementById('rec-answer').style.display='block';
+    document.getElementById('rec-answer').placeholder=q;
+    document.getElementById('rec-answer').setAttribute('data-q',q);
+  }
+  document.getElementById('recover-screen').classList.add('open');
+}
 function closeRecover(){ document.getElementById('recover-screen').classList.remove('open'); }
 function doRecover(){
-  const code=document.getElementById('rec-code').value.trim().toUpperCase();
+  if(!creds.secQ||!creds.secA){ document.getElementById('rec-err').textContent='No security question set. Ask your admin.'; return; }
+  const answer=document.getElementById('rec-answer').value.trim().toLowerCase();
   const npwd=document.getElementById('rec-pwd').value.trim();
-  if(code!==MASTER_CODE){ document.getElementById('rec-err').textContent='Wrong master code.'; return; }
+  if(answer!==creds.secA.toLowerCase()){ document.getElementById('rec-err').textContent='Wrong answer. Try again.'; return; }
   if(npwd.length<4){ document.getElementById('rec-err').textContent='Min 4 characters.'; return; }
   creds.admin=npwd; ls.s('ps_cred',creds); closeRecover(); showToast('✅ Admin password reset!','ok');
 }
@@ -906,42 +949,49 @@ function seedDemo(){
 // ═══════════════════════════════════════
 //  OCR — PLATE READING
 // ═══════════════════════════════════════
-let ocrWorker=null;
-async function getOCRWorker(){
-  if(ocrWorker) return ocrWorker;
-  try{
-    ocrWorker=await Tesseract.createWorker('eng',1,{
-      logger:()=>{}, // suppress logs
-      workerPath:'https://cdnjs.cloudflare.com/ajax/libs/Tesseract.js/5.0.4/worker.min.js',
-      corePath:'https://cdnjs.cloudflare.com/ajax/libs/Tesseract.js/5.0.4/tesseract-core.wasm.js',
-    });
-    await ocrWorker.setParameters({
-      tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
-      tessedit_pageseg_mode:'7', // single line
-    });
-  }catch(e){ ocrWorker=null; }
-  return ocrWorker;
+// ═══════════════════════════════════════
+//  OCR — PLATE READING
+// ═══════════════════════════════════════
+// Crop the plate frame region (85% wide, 30% tall, centered) from a canvas
+// This matches the .pf CSS — 85% width, 30% height
+function cropPlateArea(srcCanvas){
+  const sw=srcCanvas.width, sh=srcCanvas.height;
+  const cw=Math.round(sw*0.85), ch=Math.round(sh*0.30);
+  const cx=Math.round((sw-cw)/2), cy=Math.round((sh-ch)/2);
+  const dst=document.createElement('canvas');
+  // scale up 2× for better OCR accuracy
+  dst.width=cw*2; dst.height=ch*2;
+  const ctx=dst.getContext('2d');
+  // grey + contrast filter
+  ctx.filter='grayscale(1) contrast(1.8) brightness(1.1)';
+  ctx.drawImage(srcCanvas, cx,cy,cw,ch, 0,0,dst.width,dst.height);
+  return dst;
 }
 
-async function readPlateFromCanvas(canvas, targetInput, statusEl){
-  if(typeof Tesseract==='undefined'){ return; }
-  if(statusEl) statusEl.textContent='🔍 Reading plate…';
+async function readPlateFromCanvas(srcCanvas, targetInput, statusEl){
+  if(typeof Tesseract==='undefined'){
+    if(statusEl){ statusEl.textContent='OCR not loaded — type plate manually'; statusEl.style.color='var(--muted)'; }
+    return;
+  }
+  if(statusEl){ statusEl.textContent='🔍 Reading plate…'; statusEl.style.color='var(--muted)'; }
   try{
-    const worker=await getOCRWorker();
-    if(!worker){ if(statusEl) statusEl.textContent=''; return; }
-    const {data:{text}}=await worker.recognize(canvas);
-    // clean: keep only A-Z 0-9, strip spaces, take up to 10 chars
-    const raw=text.replace(/[^A-Z0-9]/gi,'').toUpperCase().slice(0,10);
+    const cropped=cropPlateArea(srcCanvas);
+    const result=await Tesseract.recognize(cropped,'eng',{
+      logger:()=>{},
+      tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+      tessedit_pageseg_mode:'7',
+    });
+    const raw=(result.data?.text||'').replace(/[^A-Z0-9]/gi,'').toUpperCase().trim().slice(0,10);
     if(raw.length>=3){
       if(targetInput) targetInput.value=raw;
       if(statusEl){ statusEl.textContent='✓ Plate detected: '+raw; statusEl.style.color='var(--green)'; }
-      // trigger input event so lookup fires
       if(targetInput) targetInput.dispatchEvent(new Event('input'));
     } else {
       if(statusEl){ statusEl.textContent='Could not read plate — type it manually'; statusEl.style.color='var(--muted)'; }
     }
   }catch(e){
     if(statusEl){ statusEl.textContent='OCR error — type plate manually'; statusEl.style.color='var(--muted)'; }
+    console.warn('OCR error:',e);
   }
 }
 
@@ -1919,6 +1969,10 @@ function renderSets(){
   document.getElementById('fm').value=pend.feeMoto;
   document.getElementById('pa').value='';
   document.getElementById('pc').value='';
+  document.getElementById('sec-q').value='';
+  document.getElementById('sec-a').value='';
+  const secCur=document.getElementById('sec-current');
+  if(secCur) secCur.textContent=creds.secQ?('Current question set: "'+creds.secQ+'"'):'⚠️ No security question set — you cannot reset your password if forgotten!';
   if(document.getElementById('drive-cid')) document.getElementById('drive-cid').value=driveCfg.clientId||'';
   renderDriveStatus();
   updateBackupStatus();
@@ -1945,7 +1999,12 @@ function saveSets(){
   const pa=document.getElementById('pa').value.trim(), pc=document.getElementById('pc').value.trim();
   if(pa) creds.admin=pa;
   if(pc) creds.checkpoint=pc;
-  if(pa||pc) ls.s('ps_cred',creds);
+  // save security question
+  const sq=document.getElementById('sec-q').value;
+  const sa=document.getElementById('sec-a').value.trim();
+  if(sq&&sa){ creds.secQ=sq; creds.secA=sa; }
+  else if(sq&&!sa){ showToast('Enter an answer for your security question','err'); return; }
+  if(pa||pc||sq) ls.s('ps_cred',creds);
   document.getElementById('save-btn').disabled=true;
   renderSets(); showToast('✅ Settings saved!','ok');
 }
