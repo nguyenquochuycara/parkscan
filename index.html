@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>ParkScan</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Tesseract.js/5.0.4/tesseract.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -874,6 +875,48 @@ function seedDemo(){
 }
 
 // ═══════════════════════════════════════
+//  OCR — PLATE READING
+// ═══════════════════════════════════════
+let ocrWorker=null;
+async function getOCRWorker(){
+  if(ocrWorker) return ocrWorker;
+  try{
+    ocrWorker=await Tesseract.createWorker('eng',1,{
+      logger:()=>{}, // suppress logs
+      workerPath:'https://cdnjs.cloudflare.com/ajax/libs/Tesseract.js/5.0.4/worker.min.js',
+      corePath:'https://cdnjs.cloudflare.com/ajax/libs/Tesseract.js/5.0.4/tesseract-core.wasm.js',
+    });
+    await ocrWorker.setParameters({
+      tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+      tessedit_pageseg_mode:'7', // single line
+    });
+  }catch(e){ ocrWorker=null; }
+  return ocrWorker;
+}
+
+async function readPlateFromCanvas(canvas, targetInput, statusEl){
+  if(typeof Tesseract==='undefined'){ return; }
+  if(statusEl) statusEl.textContent='🔍 Reading plate…';
+  try{
+    const worker=await getOCRWorker();
+    if(!worker){ if(statusEl) statusEl.textContent=''; return; }
+    const {data:{text}}=await worker.recognize(canvas);
+    // clean: keep only A-Z 0-9, strip spaces, take up to 10 chars
+    const raw=text.replace(/[^A-Z0-9]/gi,'').toUpperCase().slice(0,10);
+    if(raw.length>=3){
+      if(targetInput) targetInput.value=raw;
+      if(statusEl){ statusEl.textContent='✓ Plate detected: '+raw; statusEl.style.color='var(--green)'; }
+      // trigger input event so lookup fires
+      if(targetInput) targetInput.dispatchEvent(new Event('input'));
+    } else {
+      if(statusEl){ statusEl.textContent='Could not read plate — type it manually'; statusEl.style.color='var(--muted)'; }
+    }
+  }catch(e){
+    if(statusEl){ statusEl.textContent='OCR error — type plate manually'; statusEl.style.color='var(--muted)'; }
+  }
+}
+
+// ═══════════════════════════════════════
 //  CAMERA
 // ═══════════════════════════════════════
 async function togCam(){ camOn?stopCam():await startCam(); }
@@ -903,7 +946,16 @@ function capPhoto(){
   capImg=c.toDataURL('image/jpeg',.72);
   const p=document.getElementById('preview'); p.src=capImg; p.style.display='block';
   stopCam(); document.getElementById('cam-ph').style.display='none';
-  showToast('Photo captured!','ok');
+  showToast('Photo captured — reading plate…','ok');
+  // OCR: try to fill plate field automatically
+  const plateInp=document.getElementById('plate-inp');
+  const ocrStatus=document.createElement('div');
+  ocrStatus.style.cssText='font-size:12px;color:var(--muted);margin-top:4px;min-height:16px';
+  ocrStatus.id='ocr-status-checkin';
+  const existing=document.getElementById('ocr-status-checkin');
+  if(existing) existing.remove();
+  plateInp.parentElement.appendChild(ocrStatus);
+  readPlateFromCanvas(c, plateInp, ocrStatus);
 }
 
 // ═══════════════════════════════════════
@@ -935,7 +987,8 @@ function showCO(sessId, _unused){
   stopExitCamSilent();
   resetCamUI();
   resetCamUI2();
-  resetChoiceUI(''); resetChoiceUI2('');
+  resetChoiceUI('');
+  resetChoiceUI('2');
 
   if(sessId){
     // Direct checkout — no camera step required (camera is optional inside direct panel)
@@ -1017,6 +1070,16 @@ function capExitPhoto(){
   document.getElementById('co-recam-btn').style.display='flex';
   document.getElementById('co-s1-next').disabled=false;
   stopExitCam();
+  showToast('Photo captured — reading plate…','ok');
+  // OCR: read plate, then auto-advance to step 2
+  const tmpCanvas=c;
+  setTimeout(async()=>{
+    await goCoStep(2); // move to plate step first so input is visible
+    const plateInp=document.getElementById('co-plate');
+    const statusEl=document.getElementById('co-lookup-msg');
+    if(statusEl){ statusEl.textContent='🔍 Reading plate from photo…'; statusEl.style.color='var(--muted)'; }
+    await readPlateFromCanvas(tmpCanvas, plateInp, statusEl);
+  }, 300);
 }
 function retakeExitPhoto(){
   exitPhoto=null;
@@ -1074,12 +1137,14 @@ function renderCOSession(sid){
   document.getElementById('choice-free-sub').textContent='Waive '+fmtFee(fee);
 }
 
-function resetChoiceUI(prefix){
-  const sfx=prefix?'2':'';
+function resetChoiceUI(sfx){
+  sfx=sfx||'';
   const rb=document.getElementById('co-result-box'+sfx); if(rb) rb.style.display='none';
   const rw=document.getElementById('co-reason-wrap'+sfx); if(rw) rw.style.display='none';
   const ok=document.getElementById('co-ok'+sfx); if(ok) ok.disabled=true;
-  ['choice-charge','choice-free'].forEach(id=>{ const el=document.getElementById(id+sfx); if(el) el.classList.remove('selected'); });
+  ['choice-charge','choice-free'].forEach(id=>{
+    const el=document.getElementById(id+(sfx==='2'?'2':'')); if(el) el.classList.remove('selected');
+  });
 }
 
 function selectChoice(ch){
