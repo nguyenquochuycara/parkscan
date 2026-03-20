@@ -956,80 +956,139 @@ function seedDemo(){
 //  OCR — PLATE READING
 // ═══════════════════════════════════════
 
-// Crop the plate frame area matching the .pf overlay:
-// 85% wide, 30% tall, VERTICALLY CENTERED in the frame
-// Then apply aggressive preprocessing for Vietnamese plates
+// .pf overlay is 85% wide, 30% tall, vertically centered
+// Camera canvas aspect-ratio is 4:3 (set via CSS)
+// These constants must match the .pf CSS exactly
+const PLATE_FRAME_W = 0.85;
+const PLATE_FRAME_H = 0.30;
+
 function cropPlateArea(srcCanvas){
-  const sw=srcCanvas.width, sh=srcCanvas.height;
-  const cw=Math.round(sw*0.85);
-  const ch=Math.round(sh*0.32);          // 32% height
-  const cx=Math.round((sw-cw)/2);
-  const cy=Math.round((sh-ch)/2);        // centered vertically
+  const sw = srcCanvas.width, sh = srcCanvas.height;
+  const cw = Math.round(sw * PLATE_FRAME_W);
+  const ch = Math.round(sh * PLATE_FRAME_H);
+  const cx = Math.round((sw - cw) / 2);
+  const cy = Math.round((sh - ch) / 2);
 
-  // Scale up 3× — Vietnamese plates have thin strokes, need resolution
-  const scale=3;
-  const dst=document.createElement('canvas');
-  dst.width=cw*scale; dst.height=ch*scale;
-  const ctx=dst.getContext('2d');
+  // Upscale 3× so thin plate strokes are readable
+  const scale = 3;
+  const dst = document.createElement('canvas');
+  dst.width  = cw * scale;
+  dst.height = ch * scale;
+  const ctx = dst.getContext('2d');
+  ctx.drawImage(srcCanvas, cx, cy, cw, ch, 0, 0, dst.width, dst.height);
 
-  // Step 1: draw scaled-up crop
-  ctx.drawImage(srcCanvas, cx,cy,cw,ch, 0,0,dst.width,dst.height);
+  // Otsu binarization: find optimal threshold, then make pixels black or white
+  // This works far better than contrast/brightness for plate text
+  const id  = ctx.getImageData(0, 0, dst.width, dst.height);
+  const px  = id.data;
 
-  // Step 2: manual greyscale + contrast enhancement via pixel manipulation
-  const id=ctx.getImageData(0,0,dst.width,dst.height);
-  const d=id.data;
-  for(let i=0;i<d.length;i+=4){
-    // greyscale
-    const g=Math.round(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]);
-    // stretch contrast: pull towards black or white
-    const c=g<128 ? Math.max(0,g-40) : Math.min(255,g+40);
-    d[i]=d[i+1]=d[i+2]=c;
+  // Build greyscale histogram
+  const hist = new Array(256).fill(0);
+  for(let i = 0; i < px.length; i += 4){
+    const g = Math.round(0.299*px[i] + 0.587*px[i+1] + 0.114*px[i+2]);
+    hist[g]++;
   }
-  ctx.putImageData(id,0,0);
-  return dst;
+  const total = (px.length / 4);
+
+  // Otsu's method
+  let sumB = 0, wB = 0, sum = 0, max = 0, thresh = 128;
+  for(let i = 0; i < 256; i++) sum += i * hist[i];
+  for(let i = 0; i < 256; i++){
+    wB += hist[i]; if(!wB) continue;
+    const wF = total - wB; if(!wF) break;
+    sumB += i * hist[i];
+    const mB = sumB / wB, mF = (sum - sumB) / wF;
+    const between = wB * wF * (mB - mF) * (mB - mF);
+    if(between > max){ max = between; thresh = i; }
+  }
+
+  // Apply threshold — invert if plate is light-on-dark
+  // Count dark vs light pixels to decide
+  let darkCount = 0;
+  for(let i = 0; i < px.length; i += 4){
+    const g = Math.round(0.299*px[i] + 0.587*px[i+1] + 0.114*px[i+2]);
+    if(g < thresh) darkCount++;
+  }
+  const invert = darkCount > total * 0.6; // mostly dark → invert for white-on-black
+
+  for(let i = 0; i < px.length; i += 4){
+    const g = Math.round(0.299*px[i] + 0.587*px[i+1] + 0.114*px[i+2]);
+    let v = g < thresh ? 0 : 255;
+    if(invert) v = 255 - v;
+    px[i] = px[i+1] = px[i+2] = v; px[i+3] = 255;
+  }
+  ctx.putImageData(id, 0, 0);
+
+  // Add white padding so Tesseract doesn't eat edge characters
+  const padded = document.createElement('canvas');
+  const pad = 20;
+  padded.width  = dst.width  + pad*2;
+  padded.height = dst.height + pad*2;
+  const pctx = padded.getContext('2d');
+  pctx.fillStyle = '#fff';
+  pctx.fillRect(0, 0, padded.width, padded.height);
+  pctx.drawImage(dst, pad, pad);
+  return padded;
 }
 
-// Normalise raw OCR text to Vietnamese plate format
-// Input examples Tesseract may give: "66-P1\n764.66", "66P1764.66", "51A12345"
-// Output: "66P176466", "51A12345" (strip separators, max 10 alphanum)
-function normalisePlate(raw){
-  // keep letters, digits, dots and dashes for now (dot/dash are separators on VN plates)
-  const cleaned=raw.replace(/[^A-Z0-9.\-]/gi,'').toUpperCase();
-  // strip all separators to get pure alphanum, max 10
-  return cleaned.replace(/[.\-\s]/g,'').slice(0,10);
+// Vietnamese plate formats (all stored without separators):
+// Old car:  51A-123.45 → 51A12345  (8 chars: 2 digits + 1 letter + 5 digits)
+// New car:  51A1-234.56 → 51A123456 (9 chars)
+// Moto:    66-P1 764.66 → 66P176466 (9 chars: 2+1+1+5 or 2+2+5)
+// Short:   some 6-7 char plates exist
+const VN_PLATE_RE = /^[0-9]{2}[A-Z]{1,2}[0-9]{4,6}$/;
+
+function normalisePlate(rawText){
+  // strip all non-alphanumeric
+  const s = rawText.replace(/[^A-Z0-9]/gi,'').toUpperCase();
+  // must be 5–10 chars to be a plate
+  if(s.length < 5 || s.length > 10) return null;
+  // must start with 2 digits
+  if(!/^[0-9]{2}/.test(s)) return null;
+  // must have at least one letter
+  if(!/[A-Z]/.test(s)) return null;
+  return s;
 }
 
 async function readPlateFromCanvas(srcCanvas, targetInput, statusEl){
-  if(typeof Tesseract==='undefined'){
-    if(statusEl){ statusEl.textContent='OCR not available — type manually'; statusEl.style.color='var(--muted)'; }
+  if(typeof Tesseract === 'undefined'){
+    if(statusEl){ statusEl.textContent='OCR not loaded — type manually'; statusEl.style.color='var(--muted)'; }
     return;
   }
   if(statusEl){ statusEl.textContent='🔍 Reading plate…'; statusEl.style.color='var(--muted)'; }
   try{
-    const cropped=cropPlateArea(srcCanvas);
+    const cropped = cropPlateArea(srcCanvas);
 
-    // PSM 6 = block of text (handles two-row VN plates like "66-P1 / 764.66")
-    // NO character whitelist — whitelist forces misread of "-" and "." as letters
-    const { data:{ text } } = await Tesseract.recognize(cropped, 'eng', {
-      logger: ()=>{},
-      tessedit_pageseg_mode: '6',
-    });
+    // PSM 6 = sparse text block (handles 2-row VN plates)
+    // PSM 8 = single word — try both and pick the best
+    const [r6, r8] = await Promise.all([
+      Tesseract.recognize(cropped, 'eng', { logger:()=>{}, tessedit_pageseg_mode:'6' }),
+      Tesseract.recognize(cropped, 'eng', { logger:()=>{}, tessedit_pageseg_mode:'8' }),
+    ]);
 
-    const plate=normalisePlate(text);
+    const candidates = [r6, r8]
+      .map(r => normalisePlate(r.data?.text || ''))
+      .filter(Boolean);
 
-    if(plate.length>=4){
-      if(targetInput) targetInput.value=plate;
+    // prefer whichever matches VN format; fallback to longest
+    const plate = candidates.find(c => VN_PLATE_RE.test(c))
+                || candidates.sort((a,b) => b.length - a.length)[0]
+                || null;
+
+    if(plate){
+      if(targetInput) targetInput.value = plate;
+      const matched = VN_PLATE_RE.test(plate);
       if(statusEl){
-        statusEl.textContent='✓ Detected: '+plate+' — check & correct if needed';
-        statusEl.style.color='var(--green)';
+        statusEl.textContent = (matched ? '✓ ' : '⚠️ ') + plate + ' — verify & correct if needed';
+        statusEl.style.color = matched ? 'var(--green)' : 'var(--amber)';
       }
       if(targetInput) targetInput.dispatchEvent(new Event('input'));
     } else {
-      if(statusEl){ statusEl.textContent='Could not read — type plate manually'; statusEl.style.color='var(--muted)'; }
+      if(statusEl){ statusEl.textContent = 'Could not read — type plate manually'; statusEl.style.color = 'var(--muted)'; }
     }
-  }catch(e){
-    if(statusEl){ statusEl.textContent='OCR error — type plate manually'; statusEl.style.color='var(--muted)'; }
-    console.warn('OCR error:',e);
+  } catch(e){
+    if(statusEl){ statusEl.textContent = 'OCR error — type plate manually'; statusEl.style.color = 'var(--muted)'; }
+    console.warn('OCR error:', e);
   }
 }
 
