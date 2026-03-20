@@ -1688,9 +1688,9 @@ function renderRecs(){
       <!-- Info -->
       <div class="rc-info">
         <div class="rc-plate">${r.plate} ${editBtn} <button class="edit-btn" style="color:var(--blue)" onclick="event.stopPropagation();openVH('${r.plate}')">📋</button></div>
-        <div class="rc-meta">
-          <span>${fmtD(r.ci)}</span>
-          <span>${dur}</span>
+        <div class="rc-meta" style="flex-direction:column;align-items:flex-start;gap:2px">
+          <span style="color:var(--muted);font-size:11px">IN &nbsp;<strong style="color:var(--text)">${fmtDT(r.ci)}</strong></span>
+          <span style="color:var(--muted);font-size:11px">OUT <strong style="color:var(--text)">${r.co?fmtDT(r.co):'—'}</strong> <span style="color:var(--muted)">${dur}</span></span>
         </div>
         <div style="margin-top:3px;display:flex;gap:4px;flex-wrap:wrap">${badge}${freeBadge}${overnightBadge}</div>
         ${r.free&&r.reason?`<div style="font-size:11px;color:var(--teal);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Reason: ${r.reason}${waived?` · Waived: ${waived}`:''}</div>`:''}
