@@ -860,7 +860,7 @@ const DEF_CFG       = {feeCar:5000, feeMoto:2500};
 const DEF_CRED      = {admin:'admin123', checkpoint:'check123', secQ:'', secA:''};
 const PERMS = {
   admin:      {active:1,records:1,reports:1,settings:1,seeFee:1,editPlate:1,exportExcel:1},
-  checkpoint: {active:1,records:0,reports:1,settings:0,seeFee:1,editPlate:1,exportExcel:1}
+  checkpoint: {active:1,records:1,reports:1,settings:0,seeFee:1,editPlate:0,exportExcel:1}
 };
 
 // ═══════════════════════════════════════
@@ -931,7 +931,9 @@ function applyPerms(){
   const p=PERMS[role];
   document.getElementById('ulbl').textContent=role==='admin'?'Admin':'Checkpoint';
   document.getElementById('udot').style.background=role==='admin'?'var(--amber)':'var(--blue)';
-  ['records','settings'].forEach(n=>document.getElementById('t-'+n).classList.toggle('locked',!p[n]));
+  // only settings locked for checkpoint; records + reports visible to all
+  document.getElementById('t-settings').classList.toggle('locked',!p.settings);
+  document.getElementById('t-records').classList.remove('locked');
   document.getElementById('t-reports').classList.remove('locked');
 }
 function showLO(){ document.getElementById('lo-modal').classList.add('open'); }
@@ -1627,7 +1629,6 @@ function renderActive(){
 // ═══════════════════════════════════════
 function togRecFlt(){ recFlt=!recFlt; document.getElementById('flt-btn').classList.toggle('on',recFlt); renderRecs(); }
 function renderRecs(){
-  if(role!=='admin') return;
   const srch=document.getElementById('srch').value.trim().toUpperCase();
   let recs=[...state.records];
   if(recFlt) recs=recs.filter(r=>r.st==='active');
@@ -1643,13 +1644,13 @@ function renderRecs(){
     const freeBadge=r.free?`<span class="badge bg-t">FREE</span>`:'';
     const overnightBadge=overnight?`<span class="badge bg-r" style="font-size:10px">🌙 Overnight</span>`:'';
     const thumb=r.img?`<img src="${r.img}" style="width:100%;height:100%;object-fit:cover;border-radius:5px">`:(r.vt==='moto'?'🏍️':'🚗');
-    const exitPhotoBadge=r.imgOut?`<span class="badge bg-t" style="font-size:10px;cursor:pointer" onclick="event.stopPropagation();viewExitPhoto('${r.id}')">📷 Exit</span>`:'';
+    const exitPhotoBadge=r.imgOut?`<span class="badge bg-t" style="font-size:10px;cursor:pointer" onclick="event.stopPropagation();viewCompare('${r.id}')">📷 Exit photo</span>`
+      :(r.img?`<span class="badge" style="font-size:10px;background:rgba(245,166,35,.15);color:var(--amber);cursor:pointer" onclick="event.stopPropagation();viewCompare('${r.id}')">📸 Entry photo</span>`:'');
     const editBtn=r.st==='active'?`<button class="edit-btn" onclick="event.stopPropagation();openEP('${r.id}')">✏️</button>`:'';
     const coBtn=r.st==='active'?`<button class="co-inline-btn" onclick="event.stopPropagation();showCO('${r.id}')">🚪 Out</button>`:'';
-    // date+time display
     const inStr=fmtDT(r.ci);
     const outStr=r.co?fmtDT(r.co):'—';
-    return `<div class="rc${r.free?' free-rec':''}${overnight?' overnight-item':''}" onclick="${r.st==='active'?`showSessDet('${r.id}')`:``}">
+    return `<div class="rc${r.free?' free-rec':''}${overnight?' overnight-item':''}" onclick="viewCompare('${r.id}')">
       <div class="rc-thumb">${thumb}</div>
       <div class="rc-info">
         <div class="rc-plate">${r.plate} ${editBtn} <button class="edit-btn" style="color:var(--blue)" onclick="event.stopPropagation();openVH('${r.plate}')">📋</button></div>
