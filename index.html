@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>ParkScan</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Tesseract.js/5.0.4/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.21.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -412,8 +414,12 @@ select.fi option{background:var(--surface2)}
     <div class="fw"><div class="lbl">License Plate</div>
       <input class="fi" id="plate-inp" type="text" placeholder="ABC·1234" maxlength="10" oninput="this.value=this.value.toUpperCase()">
     </div>
-    <div class="fw"><div class="lbl">Vehicle Type</div>
-      <select class="fi" id="vtype">
+    <div class="fw">
+      <div class="lbl" style="display:flex;align-items:center;justify-content:space-between">
+        <span>Vehicle Type</span>
+        <span id="vt-detect-badge" style="display:none;font-size:10px;background:rgba(34,197,94,.15);color:var(--green);padding:2px 8px;border-radius:20px;font-weight:600">Auto detected</span>
+      </div>
+      <select class="fi" id="vtype" onchange="document.getElementById('vt-detect-badge').style.display='none'">
         <option value="car">🚗 Car</option>
         <option value="moto">🏍️ Motorcycle</option>
       </select>
@@ -659,13 +665,13 @@ select.fi option{background:var(--surface2)}
 
     <!-- ── STEP 2: Plate confirm ── -->
     <div id="co-s2" style="display:none">
-      <div class="co-step-lbl"><span class="co-step-num">2</span> Confirm plate from photo</div>
+      <div class="co-step-lbl"><span class="co-step-num">2</span> Confirm license plate from photo</div>
       <!-- thumbnail of captured photo -->
       <div style="margin-bottom:12px;border-radius:10px;overflow:hidden;max-height:140px">
         <img id="co-s2-thumb" style="width:100%;object-fit:cover;max-height:140px;display:block;border-radius:10px">
       </div>
       <div class="fw" style="margin-bottom:8px">
-        <div class="lbl">Plate number (read from photo)</div>
+        <div class="lbl">License Plate (read from photo)</div>
         <input class="fi" id="co-plate" type="text" placeholder="ABC·1234" maxlength="10"
                oninput="this.value=this.value.toUpperCase();lookupP()">
       </div>
@@ -767,7 +773,7 @@ select.fi option{background:var(--surface2)}
     <div class="mh"></div>
     <div class="mt">Edit Plate</div>
     <div style="font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--muted);margin-bottom:12px;letter-spacing:2px" id="ep-old">--</div>
-    <div class="fw"><div class="lbl">New Plate Number</div>
+    <div class="fw"><div class="lbl">New License Plate</div>
       <input class="fi" id="ep-new" type="text" placeholder="New plate" maxlength="10" oninput="this.value=this.value.toUpperCase()">
     </div>
     <div class="l-err" id="ep-err"></div>
@@ -970,18 +976,18 @@ function cropPlateArea(srcCanvas){
 
 async function readPlateFromCanvas(srcCanvas, targetInput, statusEl){
   if(typeof Tesseract==='undefined'){
-    if(statusEl){ statusEl.textContent='OCR not loaded — type plate manually'; statusEl.style.color='var(--muted)'; }
+    if(statusEl){ statusEl.textContent='OCR not available — type plate manually'; statusEl.style.color='var(--muted)'; }
     return;
   }
   if(statusEl){ statusEl.textContent='🔍 Reading plate…'; statusEl.style.color='var(--muted)'; }
   try{
     const cropped=cropPlateArea(srcCanvas);
-    const result=await Tesseract.recognize(cropped,'eng',{
-      logger:()=>{},
-      tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
-      tessedit_pageseg_mode:'7',
+    // Tesseract v4 API: recognize(image, lang, options)
+    const { data:{ text } } = await Tesseract.recognize(cropped, 'eng', {
+      logger: ()=>{},
     });
-    const raw=(result.data?.text||'').replace(/[^A-Z0-9]/gi,'').toUpperCase().trim().slice(0,10);
+    // clean: keep only A-Z 0-9, strip everything else, max 10 chars
+    const raw=text.replace(/[^A-Z0-9]/gi,'').toUpperCase().trim().slice(0,10);
     if(raw.length>=3){
       if(targetInput) targetInput.value=raw;
       if(statusEl){ statusEl.textContent='✓ Plate detected: '+raw; statusEl.style.color='var(--green)'; }
@@ -992,6 +998,60 @@ async function readPlateFromCanvas(srcCanvas, targetInput, statusEl){
   }catch(e){
     if(statusEl){ statusEl.textContent='OCR error — type plate manually'; statusEl.style.color='var(--muted)'; }
     console.warn('OCR error:',e);
+  }
+}
+
+// ═══════════════════════════════════════
+//  VEHICLE DETECTION (COCO-SSD)
+// ═══════════════════════════════════════
+let cocoModel=null, cocoLoading=false;
+
+async function loadCocoModel(){
+  if(cocoModel) return cocoModel;
+  if(cocoLoading) return null;
+  if(typeof cocoSsd==='undefined'||typeof tf==='undefined') return null;
+  cocoLoading=true;
+  try{
+    cocoModel=await cocoSsd.load();
+  }catch(e){ console.warn('COCO-SSD load failed:',e); cocoModel=null; }
+  cocoLoading=false;
+  return cocoModel;
+}
+
+// Pre-load model silently once page is ready
+window.addEventListener('load',()=>{ setTimeout(loadCocoModel,2000); });
+
+async function detectVehicleFromCanvas(canvas){
+  const model=await loadCocoModel();
+  if(!model) return null;
+  try{
+    const predictions=await model.detect(canvas);
+    // COCO classes we care about
+    const CAR_CLASSES  =['car','truck','bus'];
+    const MOTO_CLASSES =['motorcycle','bicycle'];
+    // score highest-confidence vehicle
+    let best=null;
+    predictions.forEach(p=>{
+      if([...CAR_CLASSES,...MOTO_CLASSES].includes(p.class)){
+        if(!best||p.score>best.score) best=p;
+      }
+    });
+    if(!best||best.score<0.35) return null;
+    return CAR_CLASSES.includes(best.class)?'car':'moto';
+  }catch(e){ return null; }
+}
+
+async function applyVehicleDetection(canvas){
+  const type=await detectVehicleFromCanvas(canvas);
+  const sel=document.getElementById('vtype');
+  const badge=document.getElementById('vt-detect-badge');
+  if(type&&sel){
+    sel.value=type;
+    const label=type==='moto'?'🏍️ Motorcycle':'🚗 Car';
+    if(badge){ badge.style.display='inline'; badge.textContent=label+' detected'; }
+    showToast(label+' detected','ok');
+  } else {
+    if(badge) badge.style.display='none';
   }
 }
 
@@ -1025,16 +1085,23 @@ function capPhoto(){
   capImg=c.toDataURL('image/jpeg',.72);
   const p=document.getElementById('preview'); p.src=capImg; p.style.display='block';
   stopCam(); document.getElementById('cam-ph').style.display='none';
-  showToast('Photo captured — reading plate…','ok');
-  // OCR: try to fill plate field automatically
+  showToast('Photo captured — analysing…','ok');
+
+  // Run OCR and vehicle detection in parallel
   const plateInp=document.getElementById('plate-inp');
+  const existing=document.getElementById('ocr-status-checkin'); if(existing) existing.remove();
   const ocrStatus=document.createElement('div');
   ocrStatus.style.cssText='font-size:12px;color:var(--muted);margin-top:4px;min-height:16px';
   ocrStatus.id='ocr-status-checkin';
-  const existing=document.getElementById('ocr-status-checkin');
-  if(existing) existing.remove();
   plateInp.parentElement.appendChild(ocrStatus);
-  readPlateFromCanvas(c, plateInp, ocrStatus);
+
+  // snapshot canvas for async use (canvas may be redrawn)
+  const snap=document.createElement('canvas');
+  snap.width=c.width; snap.height=c.height;
+  snap.getContext('2d').drawImage(c,0,0);
+
+  readPlateFromCanvas(snap, plateInp, ocrStatus);
+  applyVehicleDetection(snap);
 }
 
 // ═══════════════════════════════════════
