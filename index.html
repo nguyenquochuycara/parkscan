@@ -1,0 +1,2113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ParkScan</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --amber:#F5A623;--bg:#0F1117;--surface:#1A1D27;--surface2:#22263A;
+  --border:rgba(255,255,255,0.09);--text:#F0F2FF;--muted:#7B82A0;
+  --green:#22C55E;--red:#EF4444;--blue:#3B82F6;--teal:#14B8A6;
+  --radius:14px;--sb:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;line-height:1.5;overflow:hidden}
+#app{display:none;flex-direction:column;height:100dvh;max-width:480px;margin:0 auto}
+
+/* ── LOGIN ── */
+#login-screen{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px;overflow-y:auto}
+.l-logo{font-family:'Bebas Neue',sans-serif;font-size:50px;letter-spacing:4px;color:var(--amber);line-height:1}
+.l-logo span{color:var(--text)}
+.l-sub{font-size:12px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin:4px 0 30px}
+.l-card{width:100%;max-width:360px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:22px;margin-bottom:14px}
+.l-chips{display:flex;gap:8px;margin-bottom:16px}
+.l-chip{flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;text-align:center;transition:all .18s}
+.l-chip.on{border-color:var(--amber);color:var(--amber);background:rgba(245,166,35,.09)}
+.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:5px}
+.l-inp{width:100%;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;transition:border-color .2s;margin-bottom:10px}
+.l-inp:focus{border-color:var(--amber)}
+.l-inp::placeholder{color:var(--muted)}
+.l-err{font-size:13px;color:var(--red);text-align:center;min-height:18px;margin-bottom:8px}
+.l-btn{width:100%;padding:13px;background:var(--amber);color:#000;border:none;border-radius:12px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer}
+.l-btn:active{opacity:.83}
+.l-link{display:block;text-align:center;font-size:12px;color:var(--muted);margin-top:12px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.l-hint{font-size:11px;color:var(--muted);text-align:center;line-height:1.7}
+.l-hint code{background:var(--surface2);padding:2px 6px;border-radius:4px;border:1px solid var(--border)}
+
+/* ── HEADER ── */
+header{background:var(--surface);padding:10px 15px 9px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px;color:var(--amber)}
+.logo span{color:var(--text)}
+.h-right{display:flex;align-items:center;gap:10px}
+.h-stats{display:flex;gap:10px}
+.hst{text-align:right;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.hst strong{display:block;font-family:'DM Mono',monospace;font-size:17px;font-weight:500;line-height:1.1}
+.hst strong.g{color:var(--green)}
+.hst strong.r{color:var(--red)}
+.u-badge{display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--surface2)}
+.u-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+
+/* ── TABS ── */
+.tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.tab{flex:1;padding:9px 3px;border:none;background:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:10px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;transition:color .2s,border-color .2s}
+.tab.active{color:var(--amber);border-bottom-color:var(--amber)}
+.tab-ic{font-size:14px;display:block;margin-bottom:1px}
+.tab.locked{opacity:.2;cursor:not-allowed;pointer-events:none}
+
+/* ── SCREENS ── */
+.screen{display:none;flex:1;overflow-y:auto;overscroll-behavior:contain;padding:14px 15px;padding-bottom:calc(14px + var(--sb))}
+.screen.active{display:block}
+
+/* ── CAMERA ── */
+.cam-wrap{position:relative;background:#000;border-radius:var(--radius);overflow:hidden;aspect-ratio:4/3;margin-bottom:13px;border:2px solid var(--border)}
+#video{width:100%;height:100%;object-fit:cover;display:block}
+#canvas{display:none}
+.cam-ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+.pf{width:72%;height:22%;border:2px solid var(--amber);border-radius:6px;position:relative}
+.pf::before,.pf::after{content:'';position:absolute;width:12px;height:12px;border-color:var(--amber);border-style:solid}
+.pf::before{top:-2px;left:-2px;border-width:2px 0 0 2px}
+.pf::after{bottom:-2px;right:-2px;border-width:0 2px 2px 0}
+.cam-lbl{margin-top:10px;font-size:11px;color:rgba(245,166,35,.85);letter-spacing:1px;text-transform:uppercase;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:20px}
+.cam-ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:var(--surface2)}
+.cam-ph .ico{font-size:40px}
+.cam-ph p{font-size:13px;color:var(--muted)}
+.prev-img{width:100%;height:100%;object-fit:cover;display:none}
+.cam-btns{display:flex;gap:9px;margin-bottom:13px}
+
+/* ── BUTTONS ── */
+.btn{flex:1;padding:12px 10px;border-radius:12px;border:none;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s,transform .1s;display:flex;align-items:center;justify-content:center;gap:7px}
+.btn:active{transform:scale(.97);opacity:.85}
+.btn-amber{background:var(--amber);color:#000}
+.btn-out{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-green{background:var(--green);color:#fff}
+.btn-red{background:var(--red);color:#fff}
+.btn-blue{background:var(--blue);color:#fff}
+.btn-teal{background:var(--teal);color:#fff}
+.btn:disabled{opacity:.3;cursor:not-allowed}
+
+/* ── FIELDS ── */
+.fw{margin-bottom:12px}
+.fi{width:100%;padding:11px 13px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'DM Mono',monospace;font-size:18px;font-weight:500;letter-spacing:2px;text-transform:uppercase;outline:none;transition:border-color .2s}
+.fi:focus{border-color:var(--amber)}
+.fi::placeholder{color:var(--muted);letter-spacing:1px}
+select.fi{font-family:'DM Sans',sans-serif;font-size:14px;letter-spacing:0;text-transform:none;cursor:pointer}
+select.fi option{background:var(--surface2)}
+.fi-sm{width:100%;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color .2s}
+.fi-sm:focus{border-color:var(--amber)}
+.fi-sm::placeholder{color:var(--muted)}
+
+/* ── STATUS CARD ── */
+.sc{background:var(--surface);border-radius:var(--radius);padding:13px;border:1px solid var(--border);margin-bottom:11px}
+.sr{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+.sr:last-child{border-bottom:none}
+.sr .val{font-family:'DM Mono',monospace;font-weight:500}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.bg-g{background:rgba(34,197,94,.15);color:var(--green)}
+.bg-b{background:rgba(59,130,246,.15);color:var(--blue)}
+.bg-a{background:rgba(245,166,35,.15);color:var(--amber)}
+.bg-r{background:rgba(239,68,68,.15);color:var(--red)}
+.bg-t{background:rgba(20,184,166,.15);color:var(--teal)}
+
+/* ── CHARGE / FREE decision ── */
+.co-choice{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.co-choice-btn{
+  padding:20px 10px;border-radius:14px;border:2px solid var(--border);
+  background:var(--surface2);cursor:pointer;text-align:center;
+  transition:all .18s;font-family:'DM Sans',sans-serif;
+}
+.co-choice-btn:active{transform:scale(.97)}
+.co-choice-btn .ch-icon{font-size:28px;margin-bottom:6px}
+.co-choice-btn .ch-label{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.co-choice-btn .ch-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.co-choice-btn.charge.selected{border-color:var(--amber);background:rgba(245,166,35,.1)}
+.co-choice-btn.charge.selected .ch-label{color:var(--amber)}
+.co-choice-btn.free.selected{border-color:var(--teal);background:rgba(20,184,166,.1)}
+.co-choice-btn.free.selected .ch-label{color:var(--teal)}
+
+/* Fee display box */
+.co-result-box{border-radius:14px;padding:16px 18px;text-align:center;margin:4px 0 12px}
+.co-result-box.charge{background:rgba(245,166,35,.1);border:2px solid rgba(245,166,35,.4)}
+.co-result-box.free{background:rgba(20,184,166,.1);border:2px solid rgba(20,184,166,.4)}
+.co-rb-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.co-result-box.charge .co-rb-label{color:var(--amber)}
+.co-result-box.free   .co-rb-label{color:var(--teal)}
+.co-rb-amount{font-family:'DM Mono',monospace;font-size:36px;font-weight:500;line-height:1}
+.co-result-box.charge .co-rb-amount{color:var(--amber)}
+.co-result-box.free   .co-rb-amount{color:var(--teal)}
+.co-rb-sub{font-size:12px;color:var(--muted);margin-top:5px}
+
+/* ── ACTIVE LIST (was Lot) ── */
+.al-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.al-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px}
+.pills{display:flex;gap:5px}
+.pill{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;transition:all .15s}
+.pill.on{border-color:var(--amber);color:var(--amber);background:rgba(245,166,35,.08)}
+.al-summary{display:flex;justify-content:space-around;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:10px 12px;margin-bottom:11px}
+.as-v{font-family:'DM Mono',monospace;font-size:20px;font-weight:500;text-align:center}
+.as-l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;text-align:center}
+.al-item{display:flex;align-items:center;gap:11px;padding:12px 13px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:7px;cursor:pointer;transition:border-color .15s}
+.al-item:active{border-color:var(--amber)}
+.al-item.car-t{border-color:rgba(34,197,94,.2)}
+.al-item.moto-t{border-color:rgba(59,130,246,.2)}
+.al-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.al-icon.car {background:rgba(34,197,94,.12)}
+.al-icon.moto{background:rgba(59,130,246,.12)}
+.al-info{flex:1;min-width:0}
+.al-plate{font-family:'DM Mono',monospace;font-size:15px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;display:flex;align-items:center;gap:7px}
+.al-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.al-right{text-align:right;flex-shrink:0}
+.al-dur{font-family:'DM Mono',monospace;font-size:13px;color:var(--amber);font-weight:500}
+.al-fee{font-size:11px;color:var(--muted);margin-top:1px}
+.edit-btn{font-size:10px;padding:2px 7px;border-radius:5px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;flex-shrink:0}
+.edit-btn:active{opacity:.7}
+.co-inline-btn{display:block;margin-top:5px;font-size:11px;padding:4px 9px;border-radius:7px;border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.1);color:var(--red);cursor:pointer;font-weight:600;white-space:nowrap}
+.co-inline-btn:active{opacity:.7}
+
+/* ── RECORDS ── */
+.rtbar{display:flex;gap:7px;margin-bottom:11px}
+.srch{flex:1;padding:9px 13px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color .2s}
+.srch:focus{border-color:var(--amber)}
+.srch::placeholder{color:var(--muted)}
+.flt-btn{padding:9px 13px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--muted);font-size:14px;cursor:pointer}
+.flt-btn.on{color:var(--amber);border-color:rgba(245,166,35,.4)}
+.rc{background:var(--surface);border-radius:12px;padding:12px 13px;margin-bottom:8px;border:1px solid var(--border);display:flex;gap:11px;align-items:flex-start;cursor:pointer}
+.rc:active{border-color:var(--amber)}
+.rc.free-rec{border-color:rgba(20,184,166,.25);background:rgba(20,184,166,.03)}
+.rc-thumb{width:48px;height:38px;border-radius:7px;background:var(--surface2);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:17px}
+.rc-thumb img{width:100%;height:100%;object-fit:cover}
+.rc-info{flex:1;min-width:0}
+.rc-plate{font-family:'DM Mono',monospace;font-size:14px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.rc-meta{font-size:11px;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap}
+.rc-right{text-align:right;flex-shrink:0}
+.rc-fee{font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--amber)}
+.rc-fee.free{color:var(--teal)}
+.rc-time{font-size:11px;color:var(--muted);margin-top:1px}
+.empty{text-align:center;padding:36px 20px;color:var(--muted)}
+.empty .big{font-size:34px;margin-bottom:8px}
+
+/* ── REPORTS ── */
+.rp-tabs{display:flex;gap:5px;margin-bottom:13px}
+.rp-tab{flex:1;padding:8px 4px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;text-align:center;transition:all .15s}
+.rp-tab.on{background:rgba(245,166,35,.1);border-color:rgba(245,166,35,.4);color:var(--amber)}
+.rp-sum{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:13px}
+.rp-box{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:12px;text-align:center}
+.rp-bv{font-family:'DM Mono',monospace;font-size:20px;font-weight:500}
+.rp-bl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+.rp-row{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:6px}
+.rp-dt{font-size:13px;font-weight:500}
+.rp-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.rp-amt{font-family:'DM Mono',monospace;font-size:14px;color:var(--amber);font-weight:500}
+.exp-btn{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:12px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:11px;color:var(--green);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:9px}
+.exp-btn:active{background:rgba(34,197,94,.18)}
+
+/* Daily report */
+.rp-day-group{margin-bottom:12px}
+.rp-day-header{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;background:var(--surface);border:1px solid var(--border);border-radius:11px 11px 0 0;border-bottom:none}
+.rp-tx-list{background:var(--surface2);border:1px solid var(--border);border-radius:0 0 11px 11px;overflow:hidden}
+.rp-tx-row{display:flex;align-items:center;gap:9px;padding:9px 13px;border-bottom:1px solid var(--border);font-size:13px}
+.rp-tx-row:last-child{border-bottom:none}
+.rp-tx-icon{font-size:16px;flex-shrink:0;width:22px;text-align:center}
+.rp-tx-info{flex:1;min-width:0}
+.rp-tx-plate{font-family:'DM Mono',monospace;font-size:12px;font-weight:500;letter-spacing:1px;display:flex;align-items:center;gap:5px}
+.rp-tx-time{font-size:11px;color:var(--muted);margin-top:1px}
+
+/* Exit camera in checkout modal */
+.co-cam-box{position:relative;width:100%;height:180px;background:var(--surface2);border-radius:10px;overflow:hidden;border:1px solid var(--border)}
+.co-cam-box video{width:100%;height:100%;object-fit:cover;display:none;border-radius:10px}
+.co-cam-idle{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--muted);font-size:13px}
+.co-cam-badge{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(20,184,166,.9);color:#fff;font-size:10px;font-weight:700;letter-spacing:1px;padding:4px 14px;border-radius:20px;white-space:nowrap}
+.co-step-lbl{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;margin-bottom:12px}
+.co-step-num{width:22px;height:22px;border-radius:50%;background:var(--amber);color:#000;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* Period navigator */
+.rp-nav{display:flex;align-items:center;gap:8px;margin-bottom:13px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px 10px}
+.rp-nav-arr{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s}
+.rp-nav-arr:active{background:rgba(255,255,255,.1)}
+.rp-nav-center{flex:1;display:flex;align-items:center;justify-content:center}
+.rp-date-pick{background:transparent;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;text-align:center;cursor:pointer;outline:none;width:100%;min-width:0}
+.rp-date-pick::-webkit-calendar-picker-indicator{filter:invert(0.7);cursor:pointer}
+.rp-period-lbl{font-size:14px;font-weight:600;color:var(--text);text-align:center;cursor:default}
+
+/* Overnight highlight */
+.overnight-item{border-color:rgba(239,68,68,.35) !important;background:rgba(239,68,68,.04) !important}
+
+/* ── SETTINGS ── */
+.ss{margin-bottom:18px}
+.ss-title{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:1px;color:var(--amber);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.scard{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden}
+.srow{display:flex;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border);gap:10px}
+.srow:last-child{border-bottom:none}
+.sr-ico{font-size:18px;flex-shrink:0;width:24px;text-align:center}
+.sr-inf{flex:1}
+.sr-n{font-size:13px;font-weight:500}
+.sr-d{font-size:11px;color:var(--muted);margin-top:1px}
+.sr-ctrl{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.fee-in{width:95px;padding:7px 9px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Mono',monospace;font-size:14px;text-align:right;outline:none;transition:border-color .2s}
+.fee-in:focus{border-color:var(--amber)}
+.fee-u{font-size:11px;color:var(--muted)}
+.pwd-in{width:122px;padding:7px 9px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:border-color .2s}
+.pwd-in:focus{border-color:var(--amber)}
+
+.ds-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+
+
+
+
+
+
+
+.backup-row{display:flex;gap:7px;margin-bottom:9px}
+.backup-btn{flex:1;padding:10px 8px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:11px;font-weight:500;cursor:pointer;text-align:center}
+.backup-btn:active{opacity:.7}
+.backup-btn.xport{color:var(--green);border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.07)}
+.backup-btn.xport2{color:var(--blue);border-color:rgba(59,130,246,.3);background:rgba(59,130,246,.07)}
+
+.drive-hidden{display:none}
+.drive-status{display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--surface2);border-radius:11px;border:1px solid var(--border);font-size:13px}
+.ds-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.ds-dot.connected{background:var(--green)}
+.ds-dot.disconnected{background:var(--muted)}
+.ds-dot.syncing{background:var(--amber);animation:dspulse .8s ease-in-out infinite alternate}
+@keyframes dspulse{to{opacity:.3}}
+.drive-info{flex:1;min-width:0}
+.drive-info-name{font-weight:500}
+.drive-info-sub{font-size:11px;color:var(--muted);margin-top:1px}
+/* Primary backup status bar */
+.backup-status-bar{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:12px}
+.bs-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;background:var(--muted)}
+.bs-dot.ok{background:var(--green)}
+.bs-dot.warn{background:var(--amber)}
+.bs-name{font-size:13px;font-weight:500}
+.bs-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.bs-now-btn{padding:6px 12px;border-radius:8px;border:1px solid rgba(34,197,94,.35);background:rgba(34,197,94,.1);color:var(--green);font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0}
+.bs-now-btn:active{opacity:.7}
+
+/* Action buttons */
+.backup-action-btn{display:flex;flex-direction:column;align-items:center;gap:3px;padding:14px 10px;border-radius:12px;border:1px solid var(--border);background:var(--surface);cursor:pointer;transition:border-color .15s,background .15s}
+.backup-action-btn:active{opacity:.8}
+.backup-action-btn.export{border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.06)}
+.backup-action-btn.import{border-color:rgba(59,130,246,.3);background:rgba(59,130,246,.06)}
+.ba-label{font-size:13px;font-weight:600;color:var(--text)}
+.ba-sub{font-size:10px;color:var(--muted)}
+#file-import{display:none}
+
+/* ── MODALS ── */
+.mbd{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:flex-end;justify-content:center;z-index:500}
+.mbd.open{display:flex}
+.msh{background:var(--surface);border-radius:20px 20px 0 0;padding:18px 18px calc(18px + var(--sb));width:100%;max-width:480px;border-top:1px solid var(--border)}
+.mh{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 15px}
+.mt{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;margin-bottom:12px}
+#recover-screen{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.85);display:none;align-items:flex-end;justify-content:center}
+#recover-screen.open{display:flex}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:calc(70px + var(--sb));left:50%;transform:translateX(-50%) translateY(70px);background:var(--surface2);border:1px solid var(--border);padding:9px 17px;border-radius:30px;font-size:13px;z-index:9000;transition:transform .28s,opacity .28s;opacity:0;white-space:nowrap;max-width:92vw}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.toast.ok{border-color:rgba(34,197,94,.4);color:var(--green)}
+.toast.err{border-color:rgba(239,68,68,.4);color:var(--red)}
+.toast.info{border-color:rgba(59,130,246,.4);color:var(--blue)}
+.screen::-webkit-scrollbar{width:3px}
+.screen::-webkit-scrollbar-track{background:transparent}
+.screen::-webkit-scrollbar-thumb{background:var(--surface2);border-radius:2px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="l-logo">Park<span>Scan</span></div>
+  <div class="l-sub">Parking Management</div>
+  <div class="l-card">
+    <div class="l-chips">
+      <div class="l-chip on" id="ch-admin"     onclick="selRole('admin')">👑 Admin</div>
+      <div class="l-chip"   id="ch-checkpoint" onclick="selRole('checkpoint')">🔵 Checkpoint</div>
+    </div>
+    <div class="lbl">Password</div>
+    <input class="l-inp" id="l-pwd" type="password" placeholder="Enter password" onkeydown="if(event.key==='Enter')doLogin()">
+    <div class="l-err" id="l-err"></div>
+    <button class="l-btn" onclick="doLogin()">Sign In →</button>
+    <span class="l-link" id="forgot-lnk" onclick="openRecover()">Forgot admin password?</span>
+  </div>
+  <div class="l-hint">Default — admin: <code>admin123</code> · checkpoint: <code>check123</code></div>
+</div>
+
+<!-- RECOVER -->
+<div id="recover-screen">
+  <div class="msh" style="padding:22px 18px calc(22px + var(--sb))">
+    <div class="mh"></div>
+    <div class="mt">Reset Admin Password</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.5">Master code: <code style="background:var(--surface2);padding:2px 7px;border-radius:4px;border:1px solid var(--border);font-size:12px">PARKSCAN</code></p>
+    <div class="lbl">Master Code</div>
+    <input class="l-inp" id="rec-code" type="text" placeholder="PARKSCAN" style="text-transform:uppercase;letter-spacing:2px;font-family:'DM Mono',monospace">
+    <div class="lbl">New Admin Password</div>
+    <input class="l-inp" id="rec-pwd" type="password" placeholder="Min 4 characters">
+    <div class="l-err" id="rec-err"></div>
+    <div style="display:flex;gap:9px">
+      <button class="btn btn-out" style="flex:1;padding:11px" onclick="closeRecover()">Cancel</button>
+      <button class="btn btn-amber" style="flex:1;padding:11px" onclick="doRecover()">Reset</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <header>
+    <div class="logo">Park<span>Scan</span></div>
+    <div class="h-right">
+      <div class="h-stats">
+        <div class="hst"><strong class="g" id="h-active">--</strong>Active</div>
+        <div class="hst"><strong class="r" id="h-today">--</strong>Today</div>
+      </div>
+      <div class="u-badge" id="ubadge" onclick="showLO()">
+        <div class="u-dot" id="udot"></div>
+        <span id="ulbl">--</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" id="t-scan"     onclick="goTab('scan')"><span class="tab-ic">📷</span>Scan</button>
+    <button class="tab"        id="t-active"   onclick="goTab('active')"><span class="tab-ic">🚗</span>Active</button>
+    <button class="tab locked" id="t-records"  onclick="goTab('records')"><span class="tab-ic">📋</span>Records</button>
+    <button class="tab locked" id="t-reports"  onclick="goTab('reports')"><span class="tab-ic">📊</span>Reports</button>
+    <button class="tab locked" id="t-settings" onclick="goTab('settings')"><span class="tab-ic">⚙️</span>Settings</button>
+  </div>
+
+  <!-- ══ SCAN ══ -->
+  <div id="screen-scan" class="screen active">
+    <div class="cam-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="canvas"></canvas>
+      <img id="preview" class="prev-img">
+      <div class="cam-ph" id="cam-ph"><div class="ico">📸</div><p>Tap Start Camera</p></div>
+      <div class="cam-ov" id="cam-ov" style="display:none"><div class="pf"></div><div class="cam-lbl">Align plate here</div></div>
+    </div>
+    <div class="cam-btns">
+      <button class="btn btn-out"   id="btn-tog" onclick="togCam()">▶ Start Camera</button>
+      <button class="btn btn-amber" id="btn-cap" onclick="capPhoto()" disabled>📷 Capture</button>
+    </div>
+    <div class="fw"><div class="lbl">License Plate</div>
+      <input class="fi" id="plate-inp" type="text" placeholder="ABC·1234" maxlength="10" oninput="this.value=this.value.toUpperCase()">
+    </div>
+    <div class="fw"><div class="lbl">Vehicle Type</div>
+      <select class="fi" id="vtype">
+        <option value="car">🚗 Car</option>
+        <option value="moto">🏍️ Motorcycle</option>
+      </select>
+    </div>
+    <div id="scan-acts">
+      <button class="btn btn-green" style="width:100%;margin-bottom:9px" onclick="checkIn()">✅ Check In</button>
+      <div style="display:flex;gap:9px">
+        <button class="btn btn-red"  style="flex:1" onclick="showCO(null)">🚪 Check Out by Plate</button>
+        <button class="btn btn-out"  style="flex:1" onclick="startExitCam()">📷 Scan Exit</button>
+      </div>
+    </div>
+    <!-- session detail shown after tapping active vehicle -->
+    <div id="active-sess" style="display:none;margin-top:4px">
+      <div class="sc" id="sess-card"></div>
+      <button class="btn btn-red" style="width:100%" onclick="openCOforCur()">🚪 Check Out This Vehicle</button>
+      <button class="btn btn-out" style="width:100%;margin-top:8px" onclick="hideSessDet()">← Back</button>
+    </div>
+  </div>
+
+  <!-- ══ ACTIVE ══ -->
+  <div id="screen-active" class="screen">
+    <div class="al-header">
+      <div class="al-title">Active Sessions</div>
+      <div class="pills">
+        <button class="pill on" id="af-all"  onclick="setAF('all')">All</button>
+        <button class="pill"    id="af-car"  onclick="setAF('car')">🚗</button>
+        <button class="pill"    id="af-moto" onclick="setAF('moto')">🏍️</button>
+      </div>
+    </div>
+    <div class="al-summary">
+      <div><div class="as-v" style="color:var(--green)"  id="as-car">--</div><div class="as-l">Cars</div></div>
+      <div><div class="as-v" style="color:var(--blue)"   id="as-moto">--</div><div class="as-l">Motos</div></div>
+      <div><div class="as-v" style="color:var(--amber)"  id="as-total">--</div><div class="as-l">Total</div></div>
+      <div><div class="as-v" style="color:var(--text)"   id="as-revenue">--</div><div class="as-l">Running ₫</div></div>
+    </div>
+    <div id="active-list"></div>
+  </div>
+
+  <!-- ══ RECORDS (admin) ══ -->
+  <div id="screen-records" class="screen">
+    <div class="rtbar">
+      <input class="srch" id="srch" placeholder="Search plate…" oninput="renderRecs()">
+      <button class="flt-btn" id="flt-btn" onclick="togRecFlt()">⏱</button>
+    </div>
+    <div id="rec-list"></div>
+  </div>
+
+  <!-- ══ REPORTS ══ -->
+  <div id="screen-reports" class="screen">
+    <!-- Mode tabs -->
+    <div class="rp-tabs">
+      <button class="rp-tab on" id="rt-day"   onclick="setRP('day')">📅 Daily</button>
+      <button class="rp-tab"    id="rt-week"  onclick="setRP('week')">📆 Weekly</button>
+      <button class="rp-tab"    id="rt-month" onclick="setRP('month')">🗓️ Monthly</button>
+    </div>
+
+    <!-- Period navigator -->
+    <div class="rp-nav">
+      <button class="rp-nav-arr" onclick="shiftPeriod(-1)">◀</button>
+      <div class="rp-nav-center" id="rp-nav-center">
+        <!-- day picker -->
+        <input type="date" id="rp-pick-day"   class="rp-date-pick" onchange="onPickDay()"   style="display:none">
+        <!-- week: show week label, navigate with arrows -->
+        <span id="rp-pick-week-lbl" class="rp-period-lbl" style="display:none"></span>
+        <!-- month picker -->
+        <input type="month" id="rp-pick-month" class="rp-date-pick" onchange="onPickMonth()" style="display:none">
+      </div>
+      <button class="rp-nav-arr" onclick="shiftPeriod(+1)">▶</button>
+    </div>
+
+    <!-- Summary boxes -->
+    <div class="rp-sum" id="rp-sum"></div>
+    <button class="exp-btn" onclick="exportExcel()">⬇️ Export to Excel (.xlsx)</button>
+    <div id="rp-rows"></div>
+  </div>
+
+  <!-- ══ SETTINGS (admin) ══ -->
+  <div id="screen-settings" class="screen">
+
+    <div class="ss"><div class="ss-title">💰 Hourly Rates</div>
+      <div class="scard">
+        <div class="srow">
+          <div class="sr-ico">🚗</div>
+          <div class="sr-inf"><div class="sr-n">Car rate</div><div class="sr-d">Per full hour</div></div>
+          <div class="sr-ctrl"><input class="fee-in" id="fc" type="number" min="0" step="500" oninput="dirty();renderFP()"><span class="fee-u">₫/hr</span></div>
+        </div>
+        <div class="srow">
+          <div class="sr-ico">🏍️</div>
+          <div class="sr-inf"><div class="sr-n">Moto rate</div><div class="sr-d">Per full hour</div></div>
+          <div class="sr-ctrl"><input class="fee-in" id="fm" type="number" min="0" step="500" oninput="dirty();renderFP()"><span class="fee-u">₫/hr</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ss"><div class="ss-title">🧾 Fee Preview</div><div class="scard" id="fp"></div></div>
+
+    <div class="ss"><div class="ss-title">🔑 Passwords</div>
+      <div class="scard">
+        <div class="srow">
+          <div class="sr-ico">👑</div>
+          <div class="sr-inf"><div class="sr-n">Admin</div><div class="sr-d">Full access</div></div>
+          <div class="sr-ctrl"><input class="pwd-in" id="pa" type="password" placeholder="New password"></div>
+        </div>
+        <div class="srow">
+          <div class="sr-ico">🔵</div>
+          <div class="sr-inf"><div class="sr-n">Checkpoint</div><div class="sr-d">Scan + Active + Reports</div></div>
+          <div class="sr-ctrl"><input class="pwd-in" id="pc" type="password" placeholder="New password"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GOOGLE DRIVE -->
+    <div class="ss">
+      <div class="ss-title" onclick="this.nextElementSibling.classList.toggle('drive-hidden')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+        <span>☁️ Google Drive Backup</span>
+        <span style="font-size:12px;color:var(--muted);font-weight:400;letter-spacing:0" id="drive-status-lbl">Not connected</span>
+      </div>
+      <div class="drive-hidden" id="drive-body">
+        <div id="drive-status-wrap" style="margin-bottom:9px"></div>
+        <div class="scard" style="margin-bottom:9px">
+          <div class="srow">
+            <div class="sr-ico">🔑</div>
+            <div class="sr-inf"><div class="sr-n">OAuth Client ID</div><div class="sr-d">From Google Cloud Console</div></div>
+          </div>
+          <div style="padding:0 14px 12px">
+            <input class="fi-sm" id="drive-cid" type="text" placeholder="xxxx.apps.googleusercontent.com" style="font-size:12px" onchange="saveDriveCid()">
+            <div style="margin-top:8px;background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.25);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--muted);line-height:1.6">
+              ⚠️ <strong style="color:var(--amber)">Requires HTTPS hosting</strong> — only works when the app is opened from <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">https://</code> (e.g. GitHub Pages). Error 400 means you opened it as a local file.<br><br>
+              Use <strong style="color:var(--text)">💾 Data Backup</strong> below instead — works everywhere.
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:7px;margin-bottom:7px">
+          <button class="btn btn-amber" style="flex:1;padding:10px;font-size:13px" onclick="connectDrive()">☁️ Connect</button>
+          <button class="btn btn-out"   style="flex:1;padding:10px;font-size:13px" onclick="disconnectDrive()">✕ Disconnect</button>
+        </div>
+        <div style="display:flex;gap:7px;margin-bottom:0">
+          <button class="btn btn-out" style="flex:1;padding:10px;font-size:13px" onclick="backupNow()">⬆️ Backup Now</button>
+          <button class="btn btn-out" style="flex:1;padding:10px;font-size:13px" onclick="restoreFromDrive()">⬇️ Restore</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOCAL BACKUP — PRIMARY -->
+    <div class="ss"><div class="ss-title">💾 Data Backup</div>
+      <!-- status bar -->
+      <div class="backup-status-bar" id="backup-status-bar">
+        <div class="bs-dot" id="bs-dot"></div>
+        <div style="flex:1;min-width:0">
+          <div class="bs-name" id="bs-name">No backup yet</div>
+          <div class="bs-sub"  id="bs-sub">Export a backup file to protect your data</div>
+        </div>
+        <button class="bs-now-btn" onclick="exportJSON()" title="Backup now">⬇️ Save</button>
+      </div>
+
+      <!-- action buttons -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <button class="backup-action-btn export" onclick="exportJSON()">
+          <span style="font-size:20px">⬇️</span>
+          <span class="ba-label">Save Backup</span>
+          <span class="ba-sub">Download .json file</span>
+        </button>
+        <button class="backup-action-btn import" onclick="document.getElementById('file-import').click()">
+          <span style="font-size:20px">⬆️</span>
+          <span class="ba-label">Load Backup</span>
+          <span class="ba-sub">Restore from file</span>
+        </button>
+      </div>
+      <input type="file" id="file-import" accept=".json" onchange="importJSON(this)">
+
+      <div style="background:var(--surface2);border-radius:10px;padding:11px 13px;font-size:12px;color:var(--muted);line-height:1.6">
+        📌 <strong style="color:var(--text)">How to use:</strong> Tap <em>Save Backup</em> → file downloads to your device.<br>
+        To restore on a new device: open the app → tap <em>Load Backup</em> → pick the saved file.<br>
+        <span style="color:var(--amber)">Tip: save a backup every day or after busy sessions.</span>
+      </div>
+    </div>
+
+    <button class="btn btn-amber" style="width:100%;margin-bottom:8px;flex:none" id="save-btn" onclick="saveSets()" disabled>Save All Changes</button>
+    <button class="btn btn-out"   style="width:100%;flex:none" onclick="resetDefs()">↺ Reset to Defaults</button>
+  </div>
+</div>
+
+<!-- CHECK-OUT MODAL — 3 steps: Camera → Plate → Decision -->
+<div class="mbd" id="co-modal">
+  <div class="msh">
+    <div class="mh"></div>
+
+    <!-- ── STEP 1: Camera ── -->
+    <div id="co-s1" style="display:none">
+      <div class="co-step-lbl"><span class="co-step-num">1</span> Capture exit photo</div>
+      <div class="co-cam-box">
+        <video id="co-video" autoplay playsinline muted></video>
+        <canvas id="co-canvas" style="display:none"></canvas>
+        <img id="co-preview" style="width:100%;height:100%;object-fit:cover;border-radius:10px;display:none">
+        <div id="co-cam-ph" class="co-cam-idle"><div style="font-size:30px">📷</div><div>Tap Start Camera</div></div>
+        <div class="co-cam-badge" id="co-cam-badge" style="display:none">PHOTO CAPTURED</div>
+        <!-- plate frame overlay -->
+        <div id="co-cam-frame" style="display:none;position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <div class="pf"></div>
+          <div class="cam-lbl">Align plate here</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;margin-bottom:4px">
+        <button class="btn btn-out"   style="flex:1;padding:9px;font-size:13px" id="co-cam-btn" onclick="togExitCam()">▶ Start Camera</button>
+        <button class="btn btn-amber" style="flex:1;padding:9px;font-size:13px" id="co-cap-btn" onclick="capExitPhoto()" disabled>📷 Capture</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:4px">
+        <button class="btn btn-out" style="flex:1;padding:9px;font-size:12px" id="co-recam-btn" onclick="retakeExitPhoto()" style="display:none">↺ Retake</button>
+        <button class="btn btn-green" style="flex:1;padding:9px;font-size:13px" id="co-s1-next" onclick="goCoStep(2)" disabled>Next →</button>
+      </div>
+      <button class="btn btn-out" style="width:100%;padding:9px;font-size:12px;margin-top:2px" onclick="closeCO()">Cancel</button>
+    </div>
+
+    <!-- ── STEP 2: Plate confirm ── -->
+    <div id="co-s2" style="display:none">
+      <div class="co-step-lbl"><span class="co-step-num">2</span> Confirm plate from photo</div>
+      <!-- thumbnail of captured photo -->
+      <div style="margin-bottom:12px;border-radius:10px;overflow:hidden;max-height:140px">
+        <img id="co-s2-thumb" style="width:100%;object-fit:cover;max-height:140px;display:block;border-radius:10px">
+      </div>
+      <div class="fw" style="margin-bottom:8px">
+        <div class="lbl">Plate number (read from photo)</div>
+        <input class="fi" id="co-plate" type="text" placeholder="ABC·1234" maxlength="10"
+               oninput="this.value=this.value.toUpperCase();lookupP()">
+      </div>
+      <div id="co-lookup-msg" style="font-size:13px;text-align:center;padding:4px 0;min-height:18px;margin-bottom:8px"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-out"   style="flex:1;padding:9px;font-size:13px" onclick="goCoStep(1)">← Back</button>
+        <button class="btn btn-green" style="flex:1;padding:9px;font-size:13px" id="co-s2-next" onclick="goCoStep(3)" disabled>Next →</button>
+      </div>
+    </div>
+
+    <!-- ── STEP 3: Charge / Free decision ── -->
+    <div id="co-s3" style="display:none">
+      <div class="co-step-lbl"><span class="co-step-num">3</span> Confirm payment</div>
+      <!-- session summary with thumbnail -->
+      <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start">
+        <img id="co-s3-thumb" style="width:72px;height:54px;object-fit:cover;border-radius:8px;flex-shrink:0">
+        <div class="sc" id="co-mini-info" style="flex:1;margin-bottom:0;min-height:0"></div>
+      </div>
+
+      <div class="co-choice">
+        <div class="co-choice-btn charge" id="choice-charge" onclick="selectChoice('charge')">
+          <div class="ch-icon">💳</div>
+          <div class="ch-label">Charge</div>
+          <div class="ch-sub" id="choice-charge-sub">—</div>
+        </div>
+        <div class="co-choice-btn free" id="choice-free" onclick="selectChoice('free')">
+          <div class="ch-icon">🎟️</div>
+          <div class="ch-label">Free</div>
+          <div class="ch-sub" id="choice-free-sub">—</div>
+        </div>
+      </div>
+
+      <div id="co-result-box" style="display:none"></div>
+
+      <div id="co-reason-wrap" style="display:none;margin-bottom:10px">
+        <div class="lbl">Reason for free <span style="color:var(--muted)">(required)</span></div>
+        <input class="fi-sm" id="co-reason" type="text" placeholder="e.g. VIP, Staff, Empty space…">
+      </div>
+
+      <div style="display:flex;gap:9px;margin-top:4px">
+        <button class="btn btn-out" style="flex:1;padding:10px" onclick="goCoStep(2)">← Back</button>
+        <button class="btn btn-red" style="flex:1;padding:10px" id="co-ok" onclick="confCO()" disabled>✅ Confirm</button>
+      </div>
+    </div>
+
+    <!-- ── BYPASS: direct checkout from Active/Records (no camera required) ── -->
+    <div id="co-direct" style="display:none">
+      <div class="co-step-lbl" style="margin-bottom:8px">Direct Check Out</div>
+      <!-- optional exit photo strip -->
+      <div id="co-direct-cam-area" style="margin-bottom:10px">
+        <div class="co-cam-box" style="height:120px">
+          <video id="co-video2" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;border-radius:10px;display:none"></video>
+          <canvas id="co-canvas2" style="display:none"></canvas>
+          <img id="co-preview2" style="width:100%;height:100%;object-fit:cover;border-radius:10px;display:none">
+          <div id="co-cam-ph2" class="co-cam-idle" style="height:100%;font-size:12px"><div style="font-size:22px">📷</div><div>Optional exit photo</div></div>
+          <div class="co-cam-badge" id="co-cam-badge2" style="display:none">PHOTO SAVED</div>
+        </div>
+        <div style="display:flex;gap:7px;margin-top:7px">
+          <button class="btn btn-out"   style="flex:1;padding:7px;font-size:12px" id="co-cam-btn2" onclick="togExitCam2()">▶ Camera</button>
+          <button class="btn btn-amber" style="flex:1;padding:7px;font-size:12px" id="co-cap-btn2" onclick="capExitPhoto2()" disabled>📷 Capture</button>
+          <button class="btn btn-out"   style="flex:1;padding:7px;font-size:12px" id="co-recam-btn2" onclick="retakeExitPhoto2()" style="display:none">↺ Retake</button>
+        </div>
+      </div>
+
+      <div class="sc" id="co-direct-info" style="margin-bottom:10px"></div>
+
+      <div class="co-choice">
+        <div class="co-choice-btn charge" id="choice-charge2" onclick="selectChoice2('charge')">
+          <div class="ch-icon">💳</div>
+          <div class="ch-label">Charge</div>
+          <div class="ch-sub" id="choice-charge-sub2">—</div>
+        </div>
+        <div class="co-choice-btn free" id="choice-free2" onclick="selectChoice2('free')">
+          <div class="ch-icon">🎟️</div>
+          <div class="ch-label">Free</div>
+          <div class="ch-sub" id="choice-free-sub2">—</div>
+        </div>
+      </div>
+
+      <div id="co-result-box2" style="display:none"></div>
+
+      <div id="co-reason-wrap2" style="display:none;margin-bottom:10px">
+        <div class="lbl">Reason for free <span style="color:var(--muted)">(required)</span></div>
+        <input class="fi-sm" id="co-reason2" type="text" placeholder="e.g. VIP, Staff, Empty space…">
+      </div>
+
+      <div style="display:flex;gap:9px;margin-top:4px">
+        <button class="btn btn-out" style="flex:1;padding:10px" onclick="closeCO()">Cancel</button>
+        <button class="btn btn-red" style="flex:1;padding:10px" id="co-ok2" onclick="confCO2()" disabled>✅ Confirm</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- EDIT PLATE MODAL -->
+<div class="mbd" id="ep-modal">
+  <div class="msh">
+    <div class="mh"></div>
+    <div class="mt">Edit Plate</div>
+    <div style="font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--muted);margin-bottom:12px;letter-spacing:2px" id="ep-old">--</div>
+    <div class="fw"><div class="lbl">New Plate Number</div>
+      <input class="fi" id="ep-new" type="text" placeholder="New plate" maxlength="10" oninput="this.value=this.value.toUpperCase()">
+    </div>
+    <div class="l-err" id="ep-err"></div>
+    <div style="display:flex;gap:9px">
+      <button class="btn btn-out"   style="flex:1" onclick="closeEP()">Cancel</button>
+      <button class="btn btn-amber" style="flex:1" onclick="saveEP()">Save Plate</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOGOUT -->
+<div class="mbd" id="lo-modal">
+  <div class="msh">
+    <div class="mh"></div>
+    <div class="mt">Log Out</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:18px">Are you sure you want to log out?</p>
+    <div style="display:flex;gap:9px">
+      <button class="btn btn-out" style="flex:1" onclick="closeLO()">Cancel</button>
+      <button class="btn btn-red" style="flex:1" onclick="doLogout()">Log Out</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════
+//  CONSTANTS
+// ═══════════════════════════════════════
+const MASTER_CODE   = 'PARKSCAN';
+const DEF_CFG       = {feeCar:5000, feeMoto:2500};
+const DEF_CRED      = {admin:'admin123', checkpoint:'check123'};
+const PERMS = {
+  admin:      {active:1,records:1,reports:1,settings:1,seeFee:1,editPlate:1,exportExcel:1},
+  checkpoint: {active:1,records:0,reports:1,settings:0,seeFee:1,editPlate:1,exportExcel:1}
+};
+
+// ═══════════════════════════════════════
+//  STORAGE
+// ═══════════════════════════════════════
+const ls = {
+  g:(k,fb)=>{ try{const v=localStorage.getItem(k); return v?JSON.parse(v):fb}catch{return fb} },
+  s:(k,v)=>{ try{localStorage.setItem(k,JSON.stringify(v))}catch(e){console.warn(e)} }
+};
+let db=null;
+function openDB(){
+  return new Promise(res=>{
+    const r=indexedDB.open('ParkScanDB',2);
+    r.onupgradeneeded=e=>{ try{e.target.result.createObjectStore('data')}catch{} };
+    r.onsuccess=e=>{ db=e.target.result; res(db); };
+    r.onerror=()=>res(null);
+  });
+}
+async function idb_s(k,v){ if(!db)return; return new Promise(res=>{ const t=db.transaction('data','readwrite'); t.objectStore('data').put(v,k); t.oncomplete=()=>res(); t.onerror=()=>res(); }); }
+async function idb_g(k,fb){ if(!db)return fb; return new Promise(res=>{ const t=db.transaction('data','readonly'); const r=t.objectStore('data').get(k); r.onsuccess=()=>res(r.result!==undefined?r.result:fb); r.onerror=()=>res(fb); }); }
+
+async function persistAll(){
+  const snap={records:state.records};
+  ls.s('ps_state',snap); await idb_s('state',snap);
+  schedDriveBackup();
+}
+async function loadState(){
+  const snap=await idb_g('state', ls.g('ps_state',null));
+  if(snap?.records) state.records=snap.records;
+}
+
+// ═══════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════
+let cfg      = ls.g('ps_cfg',   {...DEF_CFG});
+let creds    = ls.g('ps_cred',  {...DEF_CRED});
+let pend     = {...cfg};
+
+// ═══════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════
+let role=null, loginRole='admin';
+
+function selRole(r){
+  loginRole=r;
+  document.getElementById('ch-admin').classList.toggle('on',r==='admin');
+  document.getElementById('ch-checkpoint').classList.toggle('on',r==='checkpoint');
+  document.getElementById('l-err').textContent='';
+  document.getElementById('l-pwd').value='';
+  document.getElementById('forgot-lnk').style.display=r==='admin'?'block':'none';
+}
+function doLogin(){
+  const pwd=document.getElementById('l-pwd').value;
+  if(pwd===creds[loginRole]){
+    role=loginRole;
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='flex';
+    applyPerms();
+    loadState().then(()=>{ updateHdr(); renderActive(); renderRecs(); if(!demoSeeded) seedDemo(); });
+  } else {
+    document.getElementById('l-err').textContent='Incorrect password.';
+    document.getElementById('l-pwd').value='';
+  }
+}
+function applyPerms(){
+  const p=PERMS[role];
+  document.getElementById('ulbl').textContent=role==='admin'?'Admin':'Checkpoint';
+  document.getElementById('udot').style.background=role==='admin'?'var(--amber)':'var(--blue)';
+  ['records','settings'].forEach(n=>document.getElementById('t-'+n).classList.toggle('locked',!p[n]));
+  document.getElementById('t-reports').classList.remove('locked'); // both roles
+}
+function showLO(){ document.getElementById('lo-modal').classList.add('open'); }
+function closeLO(){ document.getElementById('lo-modal').classList.remove('open'); }
+function doLogout(){ role=null; stopCam(); stopExitCamSilent(); closeLO(); document.getElementById('app').style.display='none'; document.getElementById('login-screen').style.display='flex'; document.getElementById('l-pwd').value=''; document.getElementById('l-err').textContent=''; goTab('scan'); }
+function openRecover(){ document.getElementById('rec-code').value=''; document.getElementById('rec-pwd').value=''; document.getElementById('rec-err').textContent=''; document.getElementById('recover-screen').classList.add('open'); }
+function closeRecover(){ document.getElementById('recover-screen').classList.remove('open'); }
+function doRecover(){
+  const code=document.getElementById('rec-code').value.trim().toUpperCase();
+  const npwd=document.getElementById('rec-pwd').value.trim();
+  if(code!==MASTER_CODE){ document.getElementById('rec-err').textContent='Wrong master code.'; return; }
+  if(npwd.length<4){ document.getElementById('rec-err').textContent='Min 4 characters.'; return; }
+  creds.admin=npwd; ls.s('ps_cred',creds); closeRecover(); showToast('✅ Admin password reset!','ok');
+}
+document.getElementById('l-pwd').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
+document.getElementById('forgot-lnk').style.display='block';
+
+// ═══════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════
+let state={records:[]};
+let stream=null, camOn=false, capImg=null, curSessId=null, epRecId=null, coSessId=null;
+let recFlt=false, alFlt='all', rpMode='day', demoSeeded=false;
+
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+
+function seedDemo(){
+  demoSeeded=true;
+  // active
+  [{plate:'51A12345',vt:'car', off:7200000},
+   {plate:'59B98765',vt:'moto',off:3600000},
+   {plate:'51G00001',vt:'car', off:900000}
+  ].forEach(d=>{
+    state.records.unshift({id:uid(),plate:d.plate,vt:d.vt,ci:Date.now()-d.off,co:null,fee:null,free:false,reason:'',st:'active',img:null});
+  });
+  // closed
+  [{plate:'30K11111',vt:'car', ci:Date.now()-86400000*1, dur:7200000, free:false},
+   {plate:'51B22222',vt:'moto',ci:Date.now()-86400000*1, dur:3600000, free:true,  reason:'Staff parking'},
+   {plate:'29A33333',vt:'car', ci:Date.now()-86400000*2, dur:10800000,free:false},
+   {plate:'51C44444',vt:'moto',ci:Date.now()-86400000*3, dur:7200000, free:false},
+   {plate:'30H55555',vt:'car', ci:Date.now()-86400000*7, dur:14400000,free:true,  reason:'Empty space'},
+   {plate:'51D66666',vt:'moto',ci:Date.now()-86400000*14,dur:3600000, free:false},
+   {plate:'51E77777',vt:'car', ci:Date.now()-86400000*20,dur:18000000,free:false},
+  ].forEach(d=>{
+    const fee=d.free?0:calcFee(d.ci,d.ci+d.dur,d.vt);
+    state.records.push({id:uid(),plate:d.plate,vt:d.vt,ci:d.ci,co:d.ci+d.dur,fee,free:d.free,reason:d.reason||'',st:'done',img:null});
+  });
+  updateHdr(); renderActive(); renderRecs();
+  persistAll();
+}
+
+// ═══════════════════════════════════════
+//  CAMERA
+// ═══════════════════════════════════════
+async function togCam(){ camOn?stopCam():await startCam(); }
+async function startCam(){
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:960}},audio:false});
+    const v=document.getElementById('video'); v.srcObject=stream; v.style.display='block';
+    document.getElementById('cam-ph').style.display='none';
+    document.getElementById('cam-ov').style.display='flex';
+    document.getElementById('preview').style.display='none';
+    document.getElementById('btn-tog').textContent='⏹ Stop Camera';
+    document.getElementById('btn-cap').disabled=false;
+    capImg=null; camOn=true;
+  }catch(e){ showToast('Camera access denied','err'); }
+}
+function stopCam(){
+  if(stream) stream.getTracks().forEach(t=>t.stop()); stream=null;
+  const v=document.getElementById('video'); if(v){v.srcObject=null;v.style.display='none';}
+  const ov=document.getElementById('cam-ov'); if(ov) ov.style.display='none';
+  const bt=document.getElementById('btn-tog'); if(bt) bt.textContent='▶ Start Camera';
+  const bc=document.getElementById('btn-cap'); if(bc) bc.disabled=true;
+  camOn=false;
+}
+function capPhoto(){
+  const v=document.getElementById('video'),c=document.getElementById('canvas');
+  c.width=v.videoWidth; c.height=v.videoHeight; c.getContext('2d').drawImage(v,0,0);
+  capImg=c.toDataURL('image/jpeg',.72);
+  const p=document.getElementById('preview'); p.src=capImg; p.style.display='block';
+  stopCam(); document.getElementById('cam-ph').style.display='none';
+  showToast('Photo captured!','ok');
+}
+
+// ═══════════════════════════════════════
+//  EXIT CAMERA + CHECKOUT  (3-step flow)
+// ═══════════════════════════════════════
+let exitStream=null, exitCamOn=false, exitPhoto=null;
+let exitStream2=null, exitCamOn2=false, exitPhoto2=null;
+let coChoice=null, coChoice2=null;
+
+function stopExitCamSilent(){
+  if(exitStream)  exitStream.getTracks().forEach(t=>t.stop());  exitStream=null;  exitCamOn=false;
+  if(exitStream2) exitStream2.getTracks().forEach(t=>t.stop()); exitStream2=null; exitCamOn2=false;
+}
+
+// ── helpers to hide/show sections ────
+function coShowOnly(id){
+  ['co-s1','co-s2','co-s3','co-direct'].forEach(s=>{
+    const el=document.getElementById(s); if(el) el.style.display='none';
+  });
+  if(id){ const el=document.getElementById(id); if(el) el.style.display='block'; }
+}
+
+// ── OPEN MODAL ────────────────────────
+// sessId=null → camera scan flow (3 steps)
+// sessId=string → direct from Active/Records (bypass camera step)
+function showCO(sessId, _unused){
+  coSessId=sessId||null; coChoice=null; coChoice2=null;
+  exitPhoto=null; exitPhoto2=null;
+  stopExitCamSilent();
+  resetCamUI();
+  resetCamUI2();
+  resetChoiceUI(''); resetChoiceUI2('');
+
+  if(sessId){
+    // Direct checkout — no camera step required (camera is optional inside direct panel)
+    coShowOnly('co-direct');
+    renderDirectPanel(sessId);
+  } else {
+    // Camera scan flow — start at step 1
+    coShowOnly('co-s1');
+    setTimeout(()=>startExitCamStream(), 150);
+  }
+  document.getElementById('co-modal').classList.add('open');
+}
+
+// Called from "📷 Scan Exit" on scan tab
+function startExitCam(){ showCO(null); }
+// Called from session detail "Check Out This Vehicle"
+function openCOforCur(){ if(!curSessId) return; hideSessDet(); showCO(curSessId); }
+
+function closeCO(){
+  stopExitCamSilent(); exitPhoto=null; exitPhoto2=null;
+  document.getElementById('co-modal').classList.remove('open');
+  coSessId=null; coChoice=null; coChoice2=null;
+}
+
+// ── STEP NAVIGATION ──────────────────
+function goCoStep(n){
+  if(n===2){
+    if(!exitPhoto){ showToast('Capture a photo first','err'); return; }
+    coShowOnly('co-s2');
+    document.getElementById('co-s2-thumb').src=exitPhoto;
+    document.getElementById('co-plate').value='';
+    document.getElementById('co-lookup-msg').textContent='';
+    document.getElementById('co-s2-next').disabled=true;
+    coSessId=null;
+    setTimeout(()=>document.getElementById('co-plate').focus(),200);
+  } else if(n===3){
+    if(!coSessId){ showToast('Enter a valid plate first','err'); return; }
+    coShowOnly('co-s3');
+    renderCOSession(coSessId);
+  } else if(n===1){
+    coShowOnly('co-s1');
+    stopExitCamSilent(); exitCamOn=false;
+    // restart camera
+    setTimeout(()=>startExitCamStream(),150);
+  }
+}
+
+// ── STEP 1 CAMERA (scan flow) ─────────
+async function togExitCam(){ exitCamOn?stopExitCam():await startExitCamStream(); }
+async function startExitCamStream(){
+  try{
+    exitStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:960}},audio:false});
+    const v=document.getElementById('co-video'); v.srcObject=exitStream; v.style.display='block';
+    document.getElementById('co-cam-ph').style.display='none';
+    document.getElementById('co-preview').style.display='none';
+    document.getElementById('co-cam-badge').style.display='none';
+    document.getElementById('co-cam-frame').style.display='flex';
+    document.getElementById('co-cam-btn').textContent='⏹ Stop';
+    document.getElementById('co-cap-btn').disabled=false;
+    document.getElementById('co-s1-next').disabled=true;
+    exitCamOn=true;
+  }catch(e){ showToast('Camera access denied','err'); }
+}
+function stopExitCam(){
+  if(exitStream) exitStream.getTracks().forEach(t=>t.stop()); exitStream=null;
+  const v=document.getElementById('co-video'); if(v){v.srcObject=null; v.style.display='none';}
+  document.getElementById('co-cam-frame').style.display='none';
+  const btn=document.getElementById('co-cam-btn'); if(btn) btn.textContent='▶ Start Camera';
+  const cap=document.getElementById('co-cap-btn'); if(cap) cap.disabled=true;
+  exitCamOn=false;
+}
+function capExitPhoto(){
+  const v=document.getElementById('co-video'),c=document.getElementById('co-canvas'); if(!v) return;
+  c.width=v.videoWidth; c.height=v.videoHeight; c.getContext('2d').drawImage(v,0,0);
+  exitPhoto=c.toDataURL('image/jpeg',.80);
+  const p=document.getElementById('co-preview'); p.src=exitPhoto; p.style.display='block';
+  document.getElementById('co-cam-frame').style.display='none';
+  document.getElementById('co-cam-badge').style.display='block';
+  document.getElementById('co-recam-btn').style.display='flex';
+  document.getElementById('co-s1-next').disabled=false;
+  stopExitCam();
+}
+function retakeExitPhoto(){
+  exitPhoto=null;
+  document.getElementById('co-preview').style.display='none';
+  document.getElementById('co-cam-badge').style.display='none';
+  document.getElementById('co-recam-btn').style.display='none';
+  document.getElementById('co-s1-next').disabled=true;
+  startExitCamStream();
+}
+function resetCamUI(){
+  const v=document.getElementById('co-video'); if(v){v.srcObject=null;v.style.display='none';}
+  const p=document.getElementById('co-preview'); if(p) p.style.display='none';
+  const b=document.getElementById('co-cam-badge'); if(b) b.style.display='none';
+  const ph=document.getElementById('co-cam-ph'); if(ph) ph.style.display='flex';
+  const f=document.getElementById('co-cam-frame'); if(f) f.style.display='none';
+  const rb=document.getElementById('co-recam-btn'); if(rb) rb.style.display='none';
+  const cb=document.getElementById('co-cam-btn'); if(cb) cb.textContent='▶ Start Camera';
+  const cp=document.getElementById('co-cap-btn'); if(cp) cp.disabled=true;
+  const nx=document.getElementById('co-s1-next'); if(nx) nx.disabled=true;
+}
+
+// ── STEP 2 PLATE LOOKUP ───────────────
+function lookupP(){
+  const plate=document.getElementById('co-plate').value.trim().toUpperCase();
+  const rec=state.records.find(r=>r.plate===plate&&r.st==='active');
+  const msg=document.getElementById('co-lookup-msg');
+  if(rec){
+    coSessId=rec.id;
+    msg.textContent='✓ Found: '+rec.vt.toUpperCase()+' · In '+fmtT(rec.ci);
+    msg.style.color='var(--green)';
+    document.getElementById('co-s2-next').disabled=false;
+  } else {
+    coSessId=null;
+    msg.textContent=plate.length>2?'No active session found':'';
+    msg.style.color='var(--muted)';
+    document.getElementById('co-s2-next').disabled=true;
+  }
+}
+
+// ── STEP 3 SESSION + CHOICE ───────────
+function renderCOSession(sid){
+  const rec=state.records.find(r=>r.id===sid); if(!rec) return;
+  const dur=getDur(rec.ci,Date.now()), fee=calcFee(rec.ci,Date.now(),rec.vt);
+  // show exit photo thumbnail in step 3
+  const t3=document.getElementById('co-s3-thumb');
+  if(exitPhoto) t3.src=exitPhoto;
+  else if(rec.img) t3.src=rec.img;
+  else { t3.style.display='none'; }
+  document.getElementById('co-mini-info').innerHTML=`
+    <div class="sr"><span>Plate</span><span class="val">${rec.plate}</span></div>
+    <div class="sr"><span>Type</span><span class="val">${rec.vt==='moto'?'🏍️ Moto':'🚗 Car'}</span></div>
+    <div class="sr"><span>Check-in</span><span class="val">${fmtDT(rec.ci)}</span></div>
+    <div class="sr"><span>Duration</span><span class="val">${dur}</span></div>`;
+  document.getElementById('choice-charge-sub').textContent=fmtFee(fee);
+  document.getElementById('choice-free-sub').textContent='Waive '+fmtFee(fee);
+}
+
+function resetChoiceUI(prefix){
+  const sfx=prefix?'2':'';
+  const rb=document.getElementById('co-result-box'+sfx); if(rb) rb.style.display='none';
+  const rw=document.getElementById('co-reason-wrap'+sfx); if(rw) rw.style.display='none';
+  const ok=document.getElementById('co-ok'+sfx); if(ok) ok.disabled=true;
+  ['choice-charge','choice-free'].forEach(id=>{ const el=document.getElementById(id+sfx); if(el) el.classList.remove('selected'); });
+}
+
+function selectChoice(ch){
+  coChoice=ch;
+  document.getElementById('choice-charge').classList.toggle('selected',ch==='charge');
+  document.getElementById('choice-free').classList.toggle('selected',ch==='free');
+  const rec=state.records.find(r=>r.id===coSessId); if(!rec) return;
+  const fee=calcFee(rec.ci,Date.now(),rec.vt), dur=getDur(rec.ci,Date.now());
+  const rb=document.getElementById('co-result-box'); rb.style.display='block';
+  if(ch==='charge'){
+    rb.innerHTML=`<div class="co-result-box charge"><div class="co-rb-label">💳 Amount to Collect</div><div class="co-rb-amount">${fmtFee(fee)}</div><div class="co-rb-sub">${dur} · ${rec.vt==='moto'?'Motorcycle':'Car'}</div></div>`;
+    document.getElementById('co-reason-wrap').style.display='none';
+  } else {
+    rb.innerHTML=`<div class="co-result-box free"><div class="co-rb-label">🎟️ Free — Waived</div><div class="co-rb-amount">${fmtFee(fee)}</div><div class="co-rb-sub">Will NOT be collected · ${dur}</div></div>`;
+    document.getElementById('co-reason-wrap').style.display='block';
+    document.getElementById('co-reason').value='';
+  }
+  document.getElementById('co-ok').disabled=false;
+}
+
+function confCO(){
+  const rec=state.records.find(r=>r.id===coSessId); if(!rec||!coChoice) return;
+  const feeAt=calcFee(rec.ci,Date.now(),rec.vt);
+  if(coChoice==='free'){
+    const reason=document.getElementById('co-reason').value.trim();
+    if(!reason){ showToast('Enter a reason for free parking','err'); return; }
+    rec.reason=reason; rec.free=true; rec.fee=0; rec.feeWaived=feeAt;
+  } else {
+    rec.fee=feeAt; rec.free=false; rec.reason=''; rec.feeWaived=0;
+  }
+  rec.co=Date.now(); rec.st='done';
+  if(exitPhoto) rec.imgOut=exitPhoto;
+  closeCO();
+  updateHdr(); renderActive(); renderRecs(); persistAll();
+  showToast(rec.free?`🎟️ ${rec.plate} FREE · Waived ${fmtFee(rec.feeWaived)}`:`🚪 ${rec.plate} · ${fmtFee(rec.fee)}`, rec.free?'info':'ok');
+}
+
+// ── DIRECT PANEL (from Active/Records rows) ───
+function renderDirectPanel(sid){
+  const rec=state.records.find(r=>r.id===sid); if(!rec) return;
+  const dur=getDur(rec.ci,Date.now()), fee=calcFee(rec.ci,Date.now(),rec.vt);
+  document.getElementById('co-direct-info').innerHTML=`
+    <div class="sr"><span>Plate</span><span class="val">${rec.plate}</span></div>
+    <div class="sr"><span>Type</span><span class="val">${rec.vt==='moto'?'🏍️ Moto':'🚗 Car'}</span></div>
+    <div class="sr"><span>Check-in</span><span class="val">${fmtDT(rec.ci)}</span></div>
+    <div class="sr"><span>Duration</span><span class="val">${dur}</span></div>`;
+  document.getElementById('choice-charge-sub2').textContent=fmtFee(fee);
+  document.getElementById('choice-free-sub2').textContent='Waive '+fmtFee(fee);
+}
+
+async function togExitCam2(){ exitCamOn2?stopExitCam2():await startExitCamStream2(); }
+async function startExitCamStream2(){
+  try{
+    exitStream2=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280}},audio:false});
+    const v=document.getElementById('co-video2'); v.srcObject=exitStream2; v.style.display='block';
+    document.getElementById('co-cam-ph2').style.display='none';
+    document.getElementById('co-preview2').style.display='none';
+    document.getElementById('co-cam-badge2').style.display='none';
+    document.getElementById('co-cam-btn2').textContent='⏹ Stop';
+    document.getElementById('co-cap-btn2').disabled=false;
+    exitCamOn2=true;
+  }catch(e){ showToast('Camera denied','err'); }
+}
+function stopExitCam2(){
+  if(exitStream2) exitStream2.getTracks().forEach(t=>t.stop()); exitStream2=null;
+  const v=document.getElementById('co-video2'); if(v){v.srcObject=null;v.style.display='none';}
+  document.getElementById('co-cam-btn2').textContent='▶ Camera';
+  document.getElementById('co-cap-btn2').disabled=true;
+  exitCamOn2=false;
+}
+function capExitPhoto2(){
+  const v=document.getElementById('co-video2'),c=document.getElementById('co-canvas2'); if(!v) return;
+  c.width=v.videoWidth; c.height=v.videoHeight; c.getContext('2d').drawImage(v,0,0);
+  exitPhoto2=c.toDataURL('image/jpeg',.78);
+  const p=document.getElementById('co-preview2'); p.src=exitPhoto2; p.style.display='block';
+  document.getElementById('co-cam-badge2').style.display='block';
+  document.getElementById('co-recam-btn2').style.display='flex';
+  stopExitCam2();
+}
+function retakeExitPhoto2(){
+  exitPhoto2=null;
+  document.getElementById('co-preview2').style.display='none';
+  document.getElementById('co-cam-badge2').style.display='none';
+  document.getElementById('co-recam-btn2').style.display='none';
+  startExitCamStream2();
+}
+function resetCamUI2(){
+  const v=document.getElementById('co-video2'); if(v){v.srcObject=null;v.style.display='none';}
+  const p=document.getElementById('co-preview2'); if(p) p.style.display='none';
+  const b=document.getElementById('co-cam-badge2'); if(b) b.style.display='none';
+  const ph=document.getElementById('co-cam-ph2'); if(ph) ph.style.display='flex';
+  const rb=document.getElementById('co-recam-btn2'); if(rb) rb.style.display='none';
+  const cb=document.getElementById('co-cam-btn2'); if(cb) cb.textContent='▶ Camera';
+  const cp=document.getElementById('co-cap-btn2'); if(cp) cp.disabled=true;
+}
+
+function selectChoice2(ch){
+  coChoice2=ch;
+  document.getElementById('choice-charge2').classList.toggle('selected',ch==='charge');
+  document.getElementById('choice-free2').classList.toggle('selected',ch==='free');
+  const rec=state.records.find(r=>r.id===coSessId); if(!rec) return;
+  const fee=calcFee(rec.ci,Date.now(),rec.vt), dur=getDur(rec.ci,Date.now());
+  const rb=document.getElementById('co-result-box2'); rb.style.display='block';
+  if(ch==='charge'){
+    rb.innerHTML=`<div class="co-result-box charge"><div class="co-rb-label">💳 Amount to Collect</div><div class="co-rb-amount">${fmtFee(fee)}</div><div class="co-rb-sub">${dur} · ${rec.vt==='moto'?'Motorcycle':'Car'}</div></div>`;
+    document.getElementById('co-reason-wrap2').style.display='none';
+  } else {
+    rb.innerHTML=`<div class="co-result-box free"><div class="co-rb-label">🎟️ Free — Waived</div><div class="co-rb-amount">${fmtFee(fee)}</div><div class="co-rb-sub">Will NOT be collected · ${dur}</div></div>`;
+    document.getElementById('co-reason-wrap2').style.display='block';
+    document.getElementById('co-reason2').value='';
+  }
+  document.getElementById('co-ok2').disabled=false;
+}
+
+function confCO2(){
+  const rec=state.records.find(r=>r.id===coSessId); if(!rec||!coChoice2) return;
+  const feeAt=calcFee(rec.ci,Date.now(),rec.vt);
+  if(coChoice2==='free'){
+    const reason=document.getElementById('co-reason2').value.trim();
+    if(!reason){ showToast('Enter a reason for free parking','err'); return; }
+    rec.reason=reason; rec.free=true; rec.fee=0; rec.feeWaived=feeAt;
+  } else {
+    rec.fee=feeAt; rec.free=false; rec.reason=''; rec.feeWaived=0;
+  }
+  rec.co=Date.now(); rec.st='done';
+  if(exitPhoto2) rec.imgOut=exitPhoto2;
+  closeCO();
+  updateHdr(); renderActive(); renderRecs(); persistAll();
+  showToast(rec.free?`🎟️ ${rec.plate} FREE · Waived ${fmtFee(rec.feeWaived)}`:`🚪 ${rec.plate} · ${fmtFee(rec.fee)}`, rec.free?'info':'ok');
+}
+// ═══════════════════════════════════════
+//  CHECK IN
+// ═══════════════════════════════════════
+function checkIn(){
+  const plate=document.getElementById('plate-inp').value.trim().replace(/\s+/g,'').toUpperCase();
+  if(!plate||plate.length<3){ showToast('Enter valid plate','err'); return; }
+  if(state.records.find(r=>r.plate===plate&&r.st==='active')){ showToast(plate+' already parked!','err'); return; }
+  const vt=document.getElementById('vtype').value;
+  const rec={id:uid(),plate,vt,ci:Date.now(),co:null,fee:null,free:false,reason:'',st:'active',img:capImg};
+  state.records.unshift(rec);
+  document.getElementById('plate-inp').value='';
+  document.getElementById('preview').style.display='none';
+  document.getElementById('cam-ph').style.display='flex';
+  capImg=null;
+  updateHdr(); renderActive(); renderRecs(); persistAll();
+  showToast('✅ '+plate+' checked in','ok');
+}
+
+function viewExitPhoto(id){
+  const rec=state.records.find(r=>r.id===id); if(!rec||!rec.imgOut) return;
+  // Show in a simple full-screen overlay
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML=`
+    <div style="font-family:\'DM Mono\',monospace;font-size:16px;color:rgba(20,184,166,1);margin-bottom:12px;letter-spacing:2px">${rec.plate} — EXIT PHOTO</div>
+    <img src="${rec.imgOut}" style="max-width:100%;max-height:70vh;border-radius:12px;object-fit:contain">
+    <div style="margin-top:14px;font-size:13px;color:rgba(255,255,255,.5)">Check-out: ${fmtDT(rec.co)}</div>
+    <button onclick="this.parentElement.remove()" style="margin-top:18px;padding:10px 30px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;cursor:pointer">Close</button>`;
+  ov.addEventListener('click',function(e){ if(e.target===this) this.remove(); });
+  document.body.appendChild(ov);
+}
+function openEP(rid){
+  const rec=state.records.find(r=>r.id===rid&&r.st==='active'); if(!rec) return;
+  epRecId=rid;
+  document.getElementById('ep-old').textContent=rec.plate;
+  document.getElementById('ep-new').value='';
+  document.getElementById('ep-err').textContent='';
+  document.getElementById('ep-modal').classList.add('open');
+}
+function closeEP(){ document.getElementById('ep-modal').classList.remove('open'); epRecId=null; }
+function saveEP(){
+  const np=document.getElementById('ep-new').value.trim().replace(/\s+/g,'').toUpperCase();
+  if(!np||np.length<3){ document.getElementById('ep-err').textContent='Enter valid plate.'; return; }
+  const rec=state.records.find(r=>r.id===epRecId); if(!rec) return;
+  if(state.records.find(r=>r.id!==epRecId&&r.plate===np&&r.st==='active')){ document.getElementById('ep-err').textContent=np+' is already active!'; return; }
+  const old=rec.plate; rec.plate=np;
+  closeEP();
+  if(curSessId===epRecId) document.getElementById('sess-card').querySelector('.val').textContent=np;
+  renderActive(); renderRecs(); persistAll();
+  showToast('✏️ '+old+' → '+np,'ok');
+}
+
+// ═══════════════════════════════════════
+//  SESSION DETAIL (scan tab)
+// ═══════════════════════════════════════
+function showSessDet(id){
+  const rec=state.records.find(r=>r.id===id&&r.st==='active'); if(!rec) return;
+  curSessId=id; const now=Date.now();
+  document.getElementById('sess-card').innerHTML=`
+    <div class="sr"><span>Plate</span><span class="val" style="display:flex;align-items:center;gap:8px">${rec.plate}
+      ${PERMS[role]?.editPlate?`<button class="edit-btn" onclick="openEP('${rec.id}')">✏️ Edit</button>`:''}
+    </span></div>
+    <div class="sr"><span>Type</span><span class="val">${rec.vt==='moto'?'🏍️ Moto':'🚗 Car'}</span></div>
+    <div class="sr"><span>Check-in</span><span class="val">${fmtT(rec.ci)}</span></div>
+    <div class="sr"><span>Duration</span><span class="val" id="sd-dur">${getDur(rec.ci,now)}</span></div>
+    <div class="sr"><span>Running Fee</span><span class="val" style="color:var(--amber)" id="sd-fee">${fmtFee(calcFee(rec.ci,now,rec.vt))}</span></div>`;
+  goTab('scan');
+  document.getElementById('scan-acts').style.display='none';
+  document.getElementById('active-sess').style.display='block';
+}
+function hideSessDet(){
+  document.getElementById('active-sess').style.display='none';
+  document.getElementById('scan-acts').style.display='block';
+  curSessId=null;
+}
+
+// ═══════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════
+function calcFee(ci,co,vt){ return Math.max(Math.ceil((co-ci)/3600000),1)*(vt==='moto'?cfg.feeMoto:cfg.feeCar); }
+function getDur(ci,co){ const ms=co-ci,h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000); return (h>0?h+'h ':'')+m+'m'; }
+function fmtT(ts){ return new Date(ts).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}); }
+function fmtD(ts){ return new Date(ts).toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'}); }
+// Compact date+time: shows "14:32" if today, "23/03 14:32" if another day
+function fmtDT(ts){
+  const d=new Date(ts), now=new Date();
+  const sameDay=d.getDate()===now.getDate()&&d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();
+  const t=d.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});
+  if(sameDay) return t;
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${t}`;
+}
+// Returns true if the session spans midnight (check-in and now/check-out are different calendar days)
+function isOvernight(ci,co){
+  const a=new Date(ci), b=new Date(co||Date.now());
+  return a.getDate()!==b.getDate()||a.getMonth()!==b.getMonth()||a.getFullYear()!==b.getFullYear();
+}
+function fmtFee(f){ return f.toLocaleString('vi-VN')+' ₫'; }
+function todayCount(){ const s=new Date(); s.setHours(0,0,0,0); return state.records.filter(r=>r.co&&r.co>=s.getTime()).length; }
+
+// ═══════════════════════════════════════
+//  HEADER
+// ═══════════════════════════════════════
+function updateHdr(){
+  document.getElementById('h-active').textContent=state.records.filter(r=>r.st==='active').length;
+  document.getElementById('h-today').textContent=todayCount();
+}
+
+// ═══════════════════════════════════════
+//  ACTIVE LIST
+// ═══════════════════════════════════════
+function setAF(f){ alFlt=f; ['all','car','moto'].forEach(k=>document.getElementById('af-'+k).classList.toggle('on',k===f)); renderActive(); }
+function renderActive(){
+  const active=state.records.filter(r=>r.st==='active');
+  const cars=active.filter(r=>r.vt==='car').length;
+  const motos=active.filter(r=>r.vt==='moto').length;
+  const runRev=active.reduce((s,r)=>s+calcFee(r.ci,Date.now(),r.vt),0);
+  document.getElementById('as-car').textContent=cars;
+  document.getElementById('as-moto').textContent=motos;
+  document.getElementById('as-total').textContent=active.length;
+  document.getElementById('as-revenue').textContent=runRev.toLocaleString('vi-VN');
+  let filtered=active;
+  if(alFlt==='car')  filtered=active.filter(r=>r.vt==='car');
+  if(alFlt==='moto') filtered=active.filter(r=>r.vt==='moto');
+  // sort: longest first
+  filtered=[...filtered].sort((a,b)=>a.ci-b.ci);
+  const con=document.getElementById('active-list');
+  if(!filtered.length){ con.innerHTML=`<div class="empty"><div class="big">🅿️</div><p>No active sessions</p></div>`; return; }
+  const canEdit=PERMS[role]?.editPlate;
+  con.innerHTML=filtered.map(r=>{
+    const now=Date.now(), dur=getDur(r.ci,now), fee=calcFee(r.ci,now,r.vt);
+    const tc=r.vt==='moto'?'moto-t':'car-t';
+    const overnight=isOvernight(r.ci,now);
+    const editBtn=canEdit?`<button class="edit-btn" onclick="event.stopPropagation();openEP('${r.id}')">✏️</button>`:'';
+    const overnightBadge=overnight?`<span class="badge bg-r" style="font-size:10px">🌙 Overnight</span>`:'';
+    return `<div class="al-item ${tc}${overnight?' overnight-item':''}">
+      <div class="al-icon ${r.vt}" onclick="showSessDet('${r.id}')">${r.vt==='moto'?'🏍️':'🚗'}</div>
+      <div class="al-info" onclick="showSessDet('${r.id}')">
+        <div class="al-plate">${r.plate} ${editBtn}</div>
+        <div class="al-meta">In <strong style="color:var(--text)">${fmtDT(r.ci)}</strong> · ${dur}</div>
+        ${overnight?`<div style="margin-top:2px">${overnightBadge}</div>`:''}
+      </div>
+      <div class="al-right">
+        <div class="al-dur" style="${overnight?'color:var(--red)':''}">${fmtFee(fee)}</div>
+        <button class="co-inline-btn" onclick="event.stopPropagation();showCO('${r.id}')">🚪 Out</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════
+//  RECORDS
+// ═══════════════════════════════════════
+function togRecFlt(){ recFlt=!recFlt; document.getElementById('flt-btn').classList.toggle('on',recFlt); renderRecs(); }
+function renderRecs(){
+  if(role!=='admin') return;
+  const srch=document.getElementById('srch').value.trim().toUpperCase();
+  let recs=[...state.records];
+  if(recFlt) recs=recs.filter(r=>r.st==='active');
+  if(srch) recs=recs.filter(r=>r.plate.includes(srch));
+  const list=document.getElementById('rec-list');
+  if(!recs.length){ list.innerHTML=`<div class="empty"><div class="big">🅿️</div><p>No records</p></div>`; return; }
+  list.innerHTML=recs.map(r=>{
+    const now=Date.now(), dur=getDur(r.ci,r.co||now);
+    const fee=r.fee!==null?fmtFee(r.fee):fmtFee(calcFee(r.ci,now,r.vt));
+    const waived=r.free&&r.feeWaived?fmtFee(r.feeWaived):'';
+    const overnight=r.st==='active'?isOvernight(r.ci,now):(r.co?isOvernight(r.ci,r.co):false);
+    const badge=r.st==='active'?`<span class="badge bg-g">● Active</span>`:`<span class="badge bg-b">Done</span>`;
+    const freeBadge=r.free?`<span class="badge bg-t">FREE</span>`:'';
+    const overnightBadge=overnight?`<span class="badge bg-r" style="font-size:10px">🌙 Overnight</span>`:'';
+    const thumb=r.img?`<img src="${r.img}" style="width:100%;height:100%;object-fit:cover;border-radius:5px">`:(r.vt==='moto'?'🏍️':'🚗');
+    const exitPhotoBadge=r.imgOut?`<span class="badge bg-t" style="font-size:10px;cursor:pointer" onclick="event.stopPropagation();viewExitPhoto('${r.id}')">📷 Exit</span>`:'';
+    const editBtn=r.st==='active'?`<button class="edit-btn" onclick="event.stopPropagation();openEP('${r.id}')">✏️</button>`:'';
+    const coBtn=r.st==='active'?`<button class="co-inline-btn" onclick="event.stopPropagation();showCO('${r.id}')">🚪 Out</button>`:'';
+    // date+time display
+    const inStr=fmtDT(r.ci);
+    const outStr=r.co?fmtDT(r.co):'—';
+    return `<div class="rc${r.free?' free-rec':''}${overnight?' overnight-item':''}" onclick="${r.st==='active'?`showSessDet('${r.id}')`:``}">
+      <div class="rc-thumb">${thumb}</div>
+      <div class="rc-info">
+        <div class="rc-plate">${r.plate} ${editBtn}</div>
+        <div class="rc-meta">
+          <span>In: <strong style="color:var(--text)">${inStr}</strong></span>
+          ${r.co?`<span>Out: ${outStr}</span>`:''}
+          <span>${dur}</span>
+        </div>
+        <div style="margin-top:3px;display:flex;gap:4px;flex-wrap:wrap">${badge}${freeBadge}${overnightBadge}${exitPhotoBadge}</div>
+        ${r.free&&r.reason?`<div style="font-size:11px;color:var(--teal);margin-top:2px">Reason: ${r.reason}${waived?` · Waived: ${waived}`:''}  </div>`:''}
+      </div>
+      <div class="rc-right">
+        <div class="rc-fee${r.free?' free':''}">${r.free?'0 ₫':fee}</div>
+        ${waived?`<div style="font-size:10px;color:var(--teal);margin-top:1px">Waived ${waived}</div>`:''}
+        ${coBtn}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════
+//  REPORTS
+// ═══════════════════════════════════════
+
+// selectedPeriod: the current key (YYYY-MM-DD for day, YYYY-MM-DD week start for week, YYYY-MM for month)
+let selectedPeriod = null;
+
+function todayKey(){ return new Date().toISOString().slice(0,10); }
+function thisWeekKey(){
+  const d=new Date(), dy=d.getDay()||7; const mon=new Date(d);
+  mon.setDate(d.getDate()-(dy-1)); mon.setHours(0,0,0,0); return mon.toISOString().slice(0,10);
+}
+function thisMonthKey(){ const d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0'); }
+
+function setRP(m){
+  rpMode=m;
+  ['day','week','month'].forEach(k=>document.getElementById('rt-'+k).classList.toggle('on',k===m));
+  // default to current period when switching modes
+  if(m==='day')   selectedPeriod=todayKey();
+  if(m==='week')  selectedPeriod=thisWeekKey();
+  if(m==='month') selectedPeriod=thisMonthKey();
+  syncPickerUI();
+  renderReports();
+}
+
+function syncPickerUI(){
+  // hide all pickers, show the right one
+  document.getElementById('rp-pick-day').style.display='none';
+  document.getElementById('rp-pick-week-lbl').style.display='none';
+  document.getElementById('rp-pick-month').style.display='none';
+  if(rpMode==='day'){
+    const el=document.getElementById('rp-pick-day'); el.style.display='block'; el.value=selectedPeriod||todayKey();
+  } else if(rpMode==='week'){
+    const el=document.getElementById('rp-pick-week-lbl'); el.style.display='block';
+    el.textContent=fmtPK(selectedPeriod||thisWeekKey(),'week');
+  } else {
+    const el=document.getElementById('rp-pick-month'); el.style.display='block'; el.value=selectedPeriod||thisMonthKey();
+  }
+}
+
+function onPickDay(){  selectedPeriod=document.getElementById('rp-pick-day').value; renderReports(); }
+function onPickMonth(){ selectedPeriod=document.getElementById('rp-pick-month').value; renderReports(); }
+
+function shiftPeriod(dir){
+  if(rpMode==='day'){
+    const d=new Date(selectedPeriod||todayKey()); d.setDate(d.getDate()+dir);
+    selectedPeriod=d.toISOString().slice(0,10);
+  } else if(rpMode==='week'){
+    const d=new Date(selectedPeriod||thisWeekKey()); d.setDate(d.getDate()+dir*7);
+    selectedPeriod=d.toISOString().slice(0,10);
+  } else {
+    const [y,m]=((selectedPeriod||thisMonthKey())).split('-').map(Number);
+    const nd=new Date(y, m-1+dir, 1);
+    selectedPeriod=nd.getFullYear()+'-'+(nd.getMonth()+1).toString().padStart(2,'0');
+  }
+  syncPickerUI();
+  renderReports();
+}
+
+function getPK(ts,m){
+  const d=new Date(ts);
+  if(m==='day')  return d.toISOString().slice(0,10);
+  if(m==='week'){ const dy=d.getDay()||7; const mon=new Date(d); mon.setDate(d.getDate()-(dy-1)); mon.setHours(0,0,0,0); return mon.toISOString().slice(0,10); }
+  return d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0');
+}
+function fmtPK(k,m){
+  if(m==='day'){   const [y,mo,d]=k.split('-'); return `${d}/${mo}/${y}`; }
+  if(m==='week'){  const st=new Date(k),en=new Date(st); en.setDate(st.getDate()+6); return `${st.getDate()}/${st.getMonth()+1} – ${en.getDate()}/${en.getMonth()+1}/${en.getFullYear()}`; }
+  const [y,mo]=k.split('-'); return ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+mo]+' '+y;
+}
+
+// Filter records for the selected period only
+function getFilteredDone(){
+  const period=selectedPeriod;
+  return state.records.filter(r=>{
+    if(r.st!=='done'||!r.co) return false;
+    return getPK(r.co,rpMode)===period;
+  });
+}
+
+function buildGroupsForPeriod(){
+  // For daily: group by day within the period
+  // For week: group by day within the week
+  // For month: group by day within the month
+  const recs=getFilteredDone();
+  const g={};
+  recs.forEach(r=>{
+    const k=getPK(r.co,'day'); // always bucket by day inside a period
+    if(!g[k]) g[k]={key:k,count:0,cars:0,motos:0,revenue:0,freeCount:0,waived:0,charged:0,records:[]};
+    g[k].count++; if(r.vt==='car') g[k].cars++; else g[k].motos++;
+    g[k].revenue+=r.fee;
+    if(r.free){ g[k].freeCount++; g[k].waived+=(r.feeWaived||0); }
+    else { g[k].charged+=r.fee; }
+    g[k].records.push(r);
+  });
+  return Object.values(g).sort((a,b)=>b.key.localeCompare(a.key));
+}
+
+// For Excel: still need all-time groups
+function buildGroups(m){
+  const done=state.records.filter(r=>r.st==='done'&&r.co);
+  const g={};
+  done.forEach(r=>{
+    const k=getPK(r.co,m);
+    if(!g[k]) g[k]={key:k,count:0,cars:0,motos:0,revenue:0,freeCount:0,waived:0,charged:0};
+    g[k].count++; if(r.vt==='car') g[k].cars++; else g[k].motos++;
+    g[k].revenue+=r.fee;
+    if(r.free){ g[k].freeCount++; g[k].waived+=(r.feeWaived||0); }
+    else { g[k].charged+=r.fee; }
+  });
+  return Object.values(g).sort((a,b)=>b.key.localeCompare(a.key));
+}
+
+function renderReports(){
+  if(!selectedPeriod){
+    if(rpMode==='day')   selectedPeriod=todayKey();
+    if(rpMode==='week')  selectedPeriod=thisWeekKey();
+    if(rpMode==='month') selectedPeriod=thisMonthKey();
+    syncPickerUI();
+  }
+
+  const recs=getFilteredDone();
+  const dayGroups=buildGroupsForPeriod();
+
+  // Summary totals for the selected period
+  const tCharged=recs.filter(r=>!r.free).reduce((s,r)=>s+r.fee,0);
+  const tWaived=recs.filter(r=>r.free).reduce((s,r)=>s+(r.feeWaived||0),0);
+  const tV=recs.length, tFree=recs.filter(r=>r.free).length;
+
+  // Period label for summary header
+  let periodLabel='';
+  if(rpMode==='day')   periodLabel=fmtPK(selectedPeriod,'day');
+  if(rpMode==='week')  periodLabel='Week of '+fmtPK(selectedPeriod,'week');
+  if(rpMode==='month') periodLabel=fmtPK(selectedPeriod,'month');
+
+  document.getElementById('rp-sum').innerHTML=`
+    <div class="rp-box"><div class="rp-bv" style="color:var(--amber)">${fmtFee(tCharged)}</div><div class="rp-bl">Charged</div></div>
+    <div class="rp-box"><div class="rp-bv" style="color:var(--teal)">${fmtFee(tWaived)}</div><div class="rp-bl">Waived (Free)</div></div>
+    <div class="rp-box"><div class="rp-bv">${tV}</div><div class="rp-bl">Vehicles</div></div>
+    <div class="rp-box"><div class="rp-bv" style="color:var(--teal)">${tFree}</div><div class="rp-bl">Free</div></div>`;
+
+  if(!recs.length){
+    document.getElementById('rp-rows').innerHTML=`<div class="empty"><div class="big">📊</div><p>No sessions for ${periodLabel}</p></div>`;
+    return;
+  }
+
+  // Daily mode: single day, just list transactions (no day header needed)
+  // Week/Month mode: group by day, show day header + transactions
+  if(rpMode==='day'){
+    const txRows=recs.sort((a,b)=>a.ci-b.ci).map(r=>txRowHtml(r)).join('');
+    document.getElementById('rp-rows').innerHTML=`<div class="rp-tx-list" style="border-radius:11px">${txRows}</div>`;
+  } else {
+    // week or month: days as collapsible groups, newest day first
+    document.getElementById('rp-rows').innerHTML=dayGroups.map(g=>{
+      const txRows=g.records.sort((a,b)=>a.ci-b.ci).map(r=>txRowHtml(r)).join('');
+      const dow=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(g.key).getDay()];
+      return `<div class="rp-day-group">
+        <div class="rp-day-header" onclick="this.nextElementSibling.classList.toggle('collapsed')" style="cursor:pointer">
+          <div>
+            <div class="rp-dt">${dow} · ${fmtPK(g.key,'day')}</div>
+            <div class="rp-sub">${g.count} vehicle${g.count!==1?'s':''} · Cars: ${g.cars} · Motos: ${g.motos}${g.freeCount?` · Free: ${g.freeCount}`:''}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="rp-amt">Charged: ${fmtFee(g.charged)}</div>
+            ${g.freeCount?`<div style="font-size:11px;color:var(--teal)">Waived: ${fmtFee(g.waived)}</div>`:''}
+          </div>
+        </div>
+        <div class="rp-tx-list">${txRows}</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function txRowHtml(r){
+  const dur=getDur(r.ci,r.co);
+  const on=isOvernight(r.ci,r.co);
+  const feeStr=r.free
+    ?`<span style="color:var(--teal);font-weight:600">FREE</span>`
+    :`<span style="color:var(--amber);font-weight:600">${fmtFee(r.fee)}</span>`;
+  const oTag=on?`<span class="badge bg-r" style="font-size:9px;padding:1px 5px">🌙</span>`:'';
+  return `<div class="rp-tx-row">
+    <div class="rp-tx-icon">${r.vt==='moto'?'🏍️':'🚗'}</div>
+    <div class="rp-tx-info">
+      <div class="rp-tx-plate">${r.plate} ${oTag}</div>
+      <div class="rp-tx-time">${fmtDT(r.ci)} → ${fmtDT(r.co)} · ${dur}</div>
+      ${r.free?`<div style="font-size:10px;color:var(--teal)">Reason: ${r.reason}</div>`:''}
+    </div>
+    <div style="text-align:right;flex-shrink:0">${feeStr}</div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════
+//  EXCEL EXPORT  (plain-value, no styling — works with free SheetJS)
+// ═══════════════════════════════════════
+function exportExcel(){
+  if(typeof XLSX==='undefined'){ showToast('Excel library not loaded','err'); return; }
+
+  // ── format helpers ────────────────────
+  const fDate=(ts)=>{ const d=new Date(ts); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; };
+  const fTime=(ts)=>{ const d=new Date(ts); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+  const fDur =(ci,co)=>{ if(!co) return ''; const ms=co-ci,h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000); return h>0?`${h}h ${m}m`:`${m}m`; };
+  const fFee =(n)=>n.toLocaleString('vi-VN');
+  const fOvn =(r)=>r.co?isOvernight(r.ci,r.co):false;
+  const fDow =(ts)=>['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(ts).getDay()];
+  const fDT  =(ts)=>ts?`${fDate(ts)} ${fTime(ts)}`:'';
+
+  const wb=XLSX.utils.book_new();
+  const isAdmin=role==='admin';
+
+  // ── helper: plain aoa → worksheet ────
+  function makeSheet(data, colWidths){
+    const ws=XLSX.utils.aoa_to_sheet(data);
+    if(colWidths) ws['!cols']=colWidths.map(w=>({wch:w}));
+    return ws;
+  }
+
+  // ── DAILY DETAIL ──────────────────────
+  if(rpMode==='day'){
+    const pl=fmtPK(selectedPeriod,'day');
+    const recs=state.records
+      .filter(r=>r.st==='done'&&r.co&&getPK(r.co,'day')===selectedPeriod)
+      .sort((a,b)=>a.ci-b.ci);
+
+    const tCh=recs.filter(r=>!r.free).reduce((s,r)=>s+r.fee,0);
+    const tWv=recs.filter(r=>r.free).reduce((s,r)=>s+(r.feeWaived||0),0);
+
+    if(!recs.length){
+      showToast('No completed sessions on '+pl,'err'); return;
+    }
+
+    const data=[
+      [`DAILY PARKING REPORT — ${pl}`],
+      [`Generated: ${fDT(Date.now())}   |   Vehicles: ${recs.length}   |   Charged sessions: ${recs.filter(r=>!r.free).length}   |   Free sessions: ${recs.filter(r=>r.free).length}`],
+      [`Total collected: ${fFee(tCh)} VND   |   Total waived: ${fFee(tWv)} VND`],
+      [],
+      ['No.','Date','Day','Plate','Vehicle','Check-In','Check-Out','Duration','Hours (billed)','Type','Rate (VND/hr)','Charged (VND)','Waived (VND)','Reason','Overnight']
+    ];
+
+    recs.forEach((r,i)=>{
+      const rate=r.vt==='moto'?cfg.feeMoto:cfg.feeCar;
+      const hrs=Math.max(Math.ceil((r.co-r.ci)/3600000),1);
+      data.push([
+        i+1,
+        fDate(r.ci),
+        fDow(r.ci),
+        r.plate,
+        r.vt==='car'?'Car':'Motorcycle',
+        fTime(r.ci),
+        fTime(r.co),
+        fDur(r.ci,r.co),
+        hrs,
+        r.free?'FREE':'CHARGE',
+        rate,
+        r.free?0:r.fee,
+        r.free?(r.feeWaived||0):0,
+        r.reason||'',
+        fOvn(r)?'YES':''
+      ]);
+    });
+
+    data.push([]);
+    data.push(['TOTAL','','','','','','','','',
+      `${recs.filter(r=>!r.free).length} charged / ${recs.filter(r=>r.free).length} free`,
+      '','CHARGED: '+fFee(tCh),'WAIVED: '+fFee(tWv),'','']);
+
+    const ws=makeSheet(data,[4,12,5,13,12,10,10,10,13,8,13,15,15,26,10]);
+    ws['!merges']=[
+      {s:{r:0,c:0},e:{r:0,c:14}},
+      {s:{r:1,c:0},e:{r:1,c:14}},
+      {s:{r:2,c:0},e:{r:2,c:14}},
+    ];
+    XLSX.utils.book_append_sheet(wb,ws,('Daily '+pl).slice(0,31));
+  }
+
+  // ── WEEKLY SUMMARY ────────────────────
+  if(rpMode==='week'){
+    const wStart=new Date(selectedPeriod); wStart.setHours(0,0,0,0);
+    const wEnd=new Date(wStart); wEnd.setDate(wStart.getDate()+6); wEnd.setHours(23,59,59,999);
+    const recs=state.records.filter(r=>r.st==='done'&&r.co&&r.co>=wStart.getTime()&&r.co<=wEnd.getTime());
+    const wLabel=fmtPK(selectedPeriod,'week');
+
+    if(!recs.length){
+      showToast('No sessions in week '+wLabel,'err'); return;
+    }
+
+    const byDay={}; recs.forEach(r=>{ const k=getPK(r.co,'day'); if(!byDay[k]) byDay[k]=[]; byDay[k].push(r); });
+    const dayKeys=Object.keys(byDay).sort();
+    const tCh=recs.filter(r=>!r.free).reduce((s,r)=>s+r.fee,0);
+    const tWv=recs.filter(r=>r.free).reduce((s,r)=>s+(r.feeWaived||0),0);
+
+    const data=[
+      [`WEEKLY PARKING REPORT — ${wLabel}`],
+      [`Generated: ${fDT(Date.now())}   |   Total vehicles: ${recs.length}   |   Collected: ${fFee(tCh)} VND   |   Waived: ${fFee(tWv)} VND`],
+      [],
+      ['Day','Date','Vehicles','Cars','Motorcycles','Charged Sessions','Charged (VND)','Free Sessions','Waived (VND)','Collected (VND)','Overnight']
+    ];
+
+    dayKeys.forEach(dk=>{
+      const dr=byDay[dk];
+      const ch=dr.filter(r=>!r.free).reduce((s,r)=>s+r.fee,0);
+      const wv=dr.filter(r=>r.free).reduce((s,r)=>s+(r.feeWaived||0),0);
+      data.push([
+        fDow(new Date(dk)), fmtPK(dk,'day'),
+        dr.length, dr.filter(r=>r.vt==='car').length, dr.filter(r=>r.vt==='moto').length,
+        dr.filter(r=>!r.free).length, ch,
+        dr.filter(r=>r.free).length, wv, ch,
+        dr.filter(r=>fOvn(r)).length
+      ]);
+    });
+
+    data.push([]);
+    data.push(['TOTAL','',recs.length,recs.filter(r=>r.vt==='car').length,recs.filter(r=>r.vt==='moto').length,
+      recs.filter(r=>!r.free).length,tCh,recs.filter(r=>r.free).length,tWv,tCh,recs.filter(r=>fOvn(r)).length]);
+
+    const ws=makeSheet(data,[7,13,10,7,13,17,16,15,14,18,10]);
+    ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:10}},{s:{r:1,c:0},e:{r:1,c:10}}];
+    XLSX.utils.book_append_sheet(wb,ws,('Week '+wLabel).slice(0,31));
+  }
+
+  // ── MONTHLY SUMMARY ───────────────────
+  if(rpMode==='month'){
+    const [yr,mo]=selectedPeriod.split('-').map(Number);
+    const mStart=new Date(yr,mo-1,1,0,0,0,0);
+    const mEnd  =new Date(yr,mo,  0,23,59,59,999);
+    const recs=state.records.filter(r=>r.st==='done'&&r.co&&r.co>=mStart.getTime()&&r.co<=mEnd.getTime());
+    const mLabel=fmtPK(selectedPeriod,'month');
+
+    if(!recs.length){
+      showToast('No sessions in '+mLabel,'err'); return;
+    }
+
+    const byDay={}; recs.forEach(r=>{ const k=getPK(r.co,'day'); if(!byDay[k]) byDay[k]=[]; byDay[k].push(r); });
+    const dayKeys=Object.keys(byDay).sort();
+    const tCh=recs.filter(r=>!r.free).reduce((s,r)=>s+r.fee,0);
+    const tWv=recs.filter(r=>r.free).reduce((s,r)=>s+(r.feeWaived||0),0);
+
+    const data=[
+      [`MONTHLY PARKING REPORT — ${mLabel}`],
+      [`Generated: ${fDT(Date.now())}   |   Total vehicles: ${recs.length}   |   Collected: ${fFee(tCh)} VND   |   Waived: ${fFee(tWv)} VND`],
+      [],
+      ['Day','Date','Vehicles','Cars','Motorcycles','Charged Sessions','Charged (VND)','Free Sessions','Waived (VND)','Collected (VND)','Overnight','Avg per Vehicle (VND)']
+    ];
+
+    dayKeys.forEach(dk=>{
+      const dr=byDay[dk];
+      const ch=dr.filter(r=>!r.free).reduce((s,r)=>s+r.fee,0);
+      const wv=dr.filter(r=>r.free).reduce((s,r)=>s+(r.feeWaived||0),0);
+      const avg=dr.length?Math.round(ch/dr.length):0;
+      data.push([
+        fDow(new Date(dk)), fmtPK(dk,'day'),
+        dr.length, dr.filter(r=>r.vt==='car').length, dr.filter(r=>r.vt==='moto').length,
+        dr.filter(r=>!r.free).length, ch,
+        dr.filter(r=>r.free).length, wv, ch,
+        dr.filter(r=>fOvn(r)).length, avg
+      ]);
+    });
+
+    data.push([]);
+    const avg=recs.length?Math.round(tCh/recs.length):0;
+    data.push(['TOTAL','',recs.length,recs.filter(r=>r.vt==='car').length,recs.filter(r=>r.vt==='moto').length,
+      recs.filter(r=>!r.free).length,tCh,recs.filter(r=>r.free).length,tWv,tCh,recs.filter(r=>fOvn(r)).length,avg]);
+
+    const ws=makeSheet(data,[7,12,10,7,13,17,16,15,14,18,10,20]);
+    ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:11}},{s:{r:1,c:0},e:{r:1,c:11}}];
+    XLSX.utils.book_append_sheet(wb,ws,('Month '+mLabel).slice(0,31));
+  }
+
+  // ── ALL RECORDS (admin only) ──────────
+  if(isAdmin){
+    const data=[
+      ['No.','Plate','Vehicle','Check-In Date','Check-In Time','Check-Out Date','Check-Out Time',
+       'Duration','Hours','Type','Rate (VND/hr)','Charged (VND)','Waived (VND)','Reason','Overnight','Status']
+    ];
+    state.records.forEach((r,i)=>{
+      const rate=r.vt==='moto'?cfg.feeMoto:cfg.feeCar;
+      const hrs=r.co?Math.max(Math.ceil((r.co-r.ci)/3600000),1):'';
+      const on=r.co?isOvernight(r.ci,r.co):false;
+      data.push([
+        i+1, r.plate,
+        r.vt==='car'?'Car':'Motorcycle',
+        fDate(r.ci), fTime(r.ci),
+        r.co?fDate(r.co):'', r.co?fTime(r.co):'',
+        r.co?fDur(r.ci,r.co):'Running', hrs,
+        r.free?'FREE':'CHARGE',
+        rate,
+        r.free?0:(r.fee||0),
+        r.free?(r.feeWaived||0):0,
+        r.reason||'',
+        on?'YES':'',
+        r.st==='active'?'Active':'Done'
+      ]);
+    });
+    const ws=makeSheet(data,[5,13,12,13,11,13,11,10,7,8,13,15,15,26,10,8]);
+    XLSX.utils.book_append_sheet(wb,ws,'All Records');
+  }
+
+  if(wb.SheetNames.length===0){
+    showToast('Nothing to export for this period','err'); return;
+  }
+
+  const today=new Date().toISOString().slice(0,10);
+  const psfx=selectedPeriod?'_'+selectedPeriod:'';
+  try {
+    XLSX.writeFile(wb,'ParkScan_'+(isAdmin?'Full':'Summary')+psfx+'_'+today+'.xlsx');
+    showToast('Downloaded — '+wb.SheetNames.length+' sheet'+(wb.SheetNames.length!==1?'s':''),'ok');
+  } catch(e){
+    showToast('Export failed: '+e.message,'err');
+  }
+}
+// ═══════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════
+function renderSets(){
+  if(role!=='admin') return;
+  document.getElementById('fc').value=pend.feeCar;
+  document.getElementById('fm').value=pend.feeMoto;
+  document.getElementById('pa').value='';
+  document.getElementById('pc').value='';
+  if(document.getElementById('drive-cid')) document.getElementById('drive-cid').value=driveCfg.clientId||'';
+  renderDriveStatus();
+  updateBackupStatus();
+  renderFP();
+}
+function renderFP(){
+  const fC=parseInt(document.getElementById('fc')?.value)||pend.feeCar;
+  const fM=parseInt(document.getElementById('fm')?.value)||pend.feeMoto;
+  const fp=document.getElementById('fp'); if(!fp) return;
+  fp.innerHTML=[1,2,3,4].map(h=>`
+    <div class="sr">
+      <span style="font-size:12px;color:var(--muted)">${h}h</span>
+      <span style="display:flex;gap:14px;font-size:12px">
+        <span style="color:var(--green)">🚗 ${(h*fC).toLocaleString('vi-VN')}₫</span>
+        <span style="color:var(--blue)">🏍 ${(h*fM).toLocaleString('vi-VN')}₫</span>
+      </span>
+    </div>`).join('');
+}
+function dirty(){ const b=document.getElementById('save-btn'); if(b) b.disabled=false; }
+function saveSets(){
+  const fC=parseInt(document.getElementById('fc').value), fM=parseInt(document.getElementById('fm').value);
+  if([fC,fM].some(v=>isNaN(v)||v<0)){ showToast('Enter valid fees','err'); return; }
+  cfg={feeCar:fC,feeMoto:fM}; pend={...cfg}; ls.s('ps_cfg',cfg);
+  const pa=document.getElementById('pa').value.trim(), pc=document.getElementById('pc').value.trim();
+  if(pa) creds.admin=pa;
+  if(pc) creds.checkpoint=pc;
+  if(pa||pc) ls.s('ps_cred',creds);
+  document.getElementById('save-btn').disabled=true;
+  renderSets(); showToast('✅ Settings saved!','ok');
+}
+function resetDefs(){
+  if(!confirm('Reset settings & passwords to defaults?')) return;
+  cfg={...DEF_CFG}; pend={...DEF_CFG}; creds={...DEF_CRED};
+  ls.s('ps_cfg',cfg); ls.s('ps_cred',creds);
+  document.getElementById('save-btn').disabled=true;
+  renderSets(); showToast('Reset to defaults','ok');
+}
+
+
+// ═══════════════════════════════════════
+//  GOOGLE DRIVE
+// ═══════════════════════════════════════
+let driveToken=null, driveTimer=null, driveReady=false;
+let driveCfg = ls.g('ps_drive', {clientId:'',fileId:'',email:''});
+
+function schedDriveBackup(){ if(!driveToken) return; clearTimeout(driveTimer); driveTimer=setTimeout(backupNow,3000); }
+
+function saveDriveCid(){
+  const cid=document.getElementById('drive-cid')?.value.trim()||'';
+  driveCfg.clientId=cid; ls.s('ps_drive',driveCfg);
+}
+
+function renderDriveStatus(){
+  const wrap=document.getElementById('drive-status-wrap'); if(!wrap) return;
+  const lbl=document.getElementById('drive-status-lbl');
+  if(lbl) lbl.textContent=driveToken?(driveCfg.email||'Connected'):'Not connected';
+  wrap.innerHTML=`<div class="drive-status">
+    <div class="ds-dot ${driveToken?'connected':'disconnected'}" id="drive-dot"></div>
+    <div class="drive-info">
+      <div class="drive-info-name">${driveToken?'Connected to Drive':'Not connected'}</div>
+      <div class="drive-info-sub">${driveToken?(driveCfg.email||'Google Drive linked'):'Connect to enable auto-backup'}</div>
+    </div>
+  </div>`;
+}
+
+async function loadDriveLibs(){
+  if(driveReady) return true;
+  const cid=document.getElementById('drive-cid')?.value.trim()||driveCfg.clientId;
+  if(!cid){ showToast('Enter OAuth Client ID first','err'); return false; }
+  if(typeof google!=='undefined'&&google.accounts){ driveReady=true; return true; }
+  return new Promise(res=>{
+    const s=document.createElement('script');
+    s.src='https://accounts.google.com/gsi/client';
+    s.onload=()=>{ driveReady=true; res(true); };
+    s.onerror=()=>{ showToast('Failed to load Google auth library','err'); res(false); };
+    document.head.appendChild(s);
+  });
+}
+
+async function connectDrive(){
+  const cid=document.getElementById('drive-cid')?.value.trim()||driveCfg.clientId;
+  if(!cid){ showToast('Enter OAuth Client ID first','err'); return; }
+  if(!window.location.protocol.startsWith('https')){
+    showToast('Drive only works on https:// — use JSON backup instead','err'); return;
+  }
+  driveCfg.clientId=cid; ls.s('ps_drive',driveCfg);
+  const ok=await loadDriveLibs(); if(!ok) return;
+  try{
+    const tc=google.accounts.oauth2.initTokenClient({
+      client_id:cid,
+      scope:'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email',
+      callback:async(r)=>{
+        if(r.error){ showToast('Auth failed: '+r.error,'err'); return; }
+        driveToken=r.access_token;
+        try{
+          const u=await fetch('https://www.googleapis.com/oauth2/v1/userinfo?alt=json',
+            {headers:{Authorization:'Bearer '+driveToken}}).then(x=>x.json());
+          driveCfg.email=u.email||'Connected'; ls.s('ps_drive',driveCfg);
+        }catch(e){}
+        renderDriveStatus();
+        showToast('☁️ Drive connected!','ok');
+        backupNow();
+      }
+    });
+    tc.requestAccessToken();
+  }catch(e){ showToast('Drive error: '+e.message,'err'); }
+}
+
+function disconnectDrive(){
+  if(!confirm('Disconnect Google Drive?')) return;
+  driveToken=null;
+  driveCfg={clientId:driveCfg.clientId,fileId:'',email:''};
+  ls.s('ps_drive',driveCfg);
+  renderDriveStatus();
+  showToast('Drive disconnected','info');
+}
+
+function buildBackupPayload(){
+  const stripped=state.records.map(r=>{ const {img:_i,imgOut:_io,...rest}=r; return rest; });
+  return JSON.stringify({v:3,ts:Date.now(),cfg,records:stripped});
+}
+
+async function driveReq(url,method,body,ct='application/json'){
+  const h={'Authorization':'Bearer '+driveToken};
+  if(ct) h['Content-Type']=ct;
+  const res=await fetch(url,{method,headers:h,body});
+  if(res.status===401){ driveToken=null; renderDriveStatus(); showToast('Drive session expired — reconnect','err'); throw new Error('401'); }
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  return res;
+}
+
+async function backupNow(){
+  if(!driveToken){ showToast('Connect Drive first','err'); return; }
+  setDot('syncing');
+  const body=buildBackupPayload();
+  try{
+    if(!driveCfg.fileId){
+      const m=await (await driveReq('https://www.googleapis.com/drive/v3/files','POST',
+        JSON.stringify({name:'ParkScan_Backup.json',mimeType:'application/json'}))).json();
+      driveCfg.fileId=m.id; ls.s('ps_drive',driveCfg);
+    }
+    await driveReq(`https://www.googleapis.com/upload/drive/v3/files/${driveCfg.fileId}?uploadType=media`,'PATCH',body,'application/json');
+    setDot('connected');
+    showToast('☁️ Backed up to Drive ('+Math.round(body.length/1024)+' KB)','ok');
+  }catch(e){ setDot('connected'); if(!e.message.includes('401')) showToast('Backup failed: '+e.message,'err'); }
+}
+
+async function restoreFromDrive(){
+  if(!driveToken){ showToast('Connect Drive first','err'); return; }
+  if(!driveCfg.fileId){ showToast('No backup found on Drive','err'); return; }
+  if(!confirm('Restore from Google Drive? Current data will be replaced.')) return;
+  setDot('syncing');
+  try{
+    const res=await driveReq(`https://www.googleapis.com/drive/v3/files/${driveCfg.fileId}?alt=media`,'GET',null,null);
+    const data=await res.json();
+    if(!data.records) throw new Error('Invalid backup');
+    const imgMap={}; state.records.forEach(r=>{ if(r.img||r.imgOut) imgMap[r.id]={img:r.img,imgOut:r.imgOut}; });
+    state.records=data.records.map(r=>({...r,...(imgMap[r.id]||{})}));
+    if(data.cfg){ cfg={...DEF_CFG,...data.cfg}; ls.s('ps_cfg',cfg); }
+    await persistAll(); updateHdr(); renderActive(); renderRecs();
+    setDot('connected'); showToast('✅ Restored from Drive!','ok');
+  }catch(e){ setDot('connected'); if(!e.message.includes('401')) showToast('Restore failed: '+e.message,'err'); }
+}
+
+function setDot(s){ const d=document.getElementById('drive-dot'); if(d) d.className='ds-dot '+s; }
+
+// LOCAL BACKUP
+function exportJSON(){
+  const data={v:3,ts:Date.now(),cfg,creds,records:state.records};
+  const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+  const dateStr=new Date().toISOString().slice(0,16).replace('T','_').replace(':','h');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='ParkScan_Backup_'+dateStr+'.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  // remember last backup time
+  ls.s('ps_last_backup', Date.now());
+  updateBackupStatus();
+  showToast('💾 Backup saved!','ok');
+}
+
+function importJSON(input){
+  const file=input.files[0]; if(!file) return;
+  if(!confirm('Load backup file?\n\n"'+file.name+'"\n\nThis will replace ALL current data.')) return;
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      if(!data.records) throw new Error('Not a valid ParkScan backup file');
+      state.records=data.records;
+      if(data.cfg){ cfg={...DEF_CFG,...data.cfg}; ls.s('ps_cfg',cfg); }
+      if(data.creds&&role==='admin'){ creds={...DEF_CRED,...data.creds}; ls.s('ps_cred',creds); }
+      await persistAll();
+      updateHdr(); renderActive(); renderRecs();
+      ls.s('ps_last_backup', data.ts||Date.now());
+      updateBackupStatus();
+      showToast('✅ Backup loaded — '+state.records.length+' records','ok');
+    }catch(err){ showToast('Failed: '+err.message,'err'); }
+    input.value='';
+  };
+  reader.readAsText(file);
+}
+
+function updateBackupStatus(){
+  const dot=document.getElementById('bs-dot');
+  const name=document.getElementById('bs-name');
+  const sub=document.getElementById('bs-sub');
+  if(!dot||!name||!sub) return;
+  const last=ls.g('ps_last_backup',null);
+  if(!last){
+    dot.className='bs-dot warn';
+    name.textContent='No backup saved yet';
+    sub.textContent='Tap Save Backup to protect your data';
+    return;
+  }
+  const ago=Date.now()-last;
+  const h=Math.floor(ago/3600000), d=Math.floor(ago/86400000);
+  let agoStr= d>0 ? d+' day'+(d!==1?'s':'')+' ago' : h>0 ? h+' hour'+(h!==1?'s':'')+' ago' : 'Just now';
+  const fmtLast=new Date(last).toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  dot.className='bs-dot '+(d>=3?'warn':'ok');
+  name.textContent='Last backup: '+fmtLast;
+  sub.textContent=agoStr+(d>=3?' — please save again soon':'');
+}
+
+
+// ═══════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════
+function goTab(n){
+  if((n==='records'||n==='settings')&&!PERMS[role]?.[n]){ showToast('Admin only','err'); return; }
+  ['scan','active','records','reports','settings'].forEach(x=>document.getElementById('t-'+x)?.classList.toggle('active',x===n));
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+n).classList.add('active');
+  if(n==='active')   renderActive();
+  if(n==='records')  renderRecs();
+  if(n==='reports'){
+    if(!selectedPeriod){
+      if(rpMode==='day')   selectedPeriod=todayKey();
+      if(rpMode==='week')  selectedPeriod=thisWeekKey();
+      if(rpMode==='month') selectedPeriod=thisMonthKey();
+    }
+    syncPickerUI(); renderReports();
+  }
+  if(n==='settings'){ pend={...cfg}; renderSets(); }
+}
+
+// ═══════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════
+function showToast(msg,type=''){
+  const t=document.getElementById('toast'); t.textContent=msg; t.className='toast '+type+' show';
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// ═══════════════════════════════════════
+//  LIVE TIMER
+// ═══════════════════════════════════════
+setInterval(()=>{
+  updateHdr();
+  if(state.records.some(r=>r.st==='active')){
+    if(document.getElementById('screen-active').classList.contains('active'))   renderActive();
+    if(document.getElementById('screen-records').classList.contains('active'))  renderRecs();
+    if(document.getElementById('screen-reports').classList.contains('active'))  renderReports();
+  }
+  if(curSessId&&document.getElementById('active-sess').style.display!=='none'){
+    const rec=state.records.find(r=>r.id===curSessId&&r.st==='active');
+    if(rec){
+      const dd=document.getElementById('sd-dur'),df=document.getElementById('sd-fee');
+      if(dd) dd.textContent=getDur(rec.ci,Date.now());
+      if(df) df.textContent=fmtFee(calcFee(rec.ci,Date.now(),rec.vt));
+    }
+  }
+},12000);
+
+// MODAL CLOSE ON BACKDROP
+['co-modal','ep-modal','lo-modal'].forEach(id=>{ document.getElementById(id).addEventListener('click',function(e){ if(e.target===this) this.classList.remove('open'); }); });
+document.getElementById('recover-screen').addEventListener('click',function(e){ if(e.target===this) closeRecover(); });
+
+// ═══════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════
+openDB().then(()=> loadState().then(()=>{ updateHdr(); renderActive(); renderRecs(); }));
+</script>
+</body>
+</html>
