@@ -282,6 +282,15 @@ select.fi{font-family:'DM Sans',sans-serif;font-size:16px;letter-spacing:0;text-
 .co-cam-badge{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(20,184,166,.9);color:#fff;font-size:10px;font-weight:700;letter-spacing:1px;padding:4px 14px;border-radius:20px;white-space:nowrap}
 .co-step-lbl{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;margin-bottom:12px}
 .co-step-num{width:22px;height:22px;border-radius:50%;background:var(--amber);color:#000;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+/* Photo comparison grid */
+.co-compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.co-cmp-col{display:flex;flex-direction:column;gap:4px}
+.co-cmp-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;text-align:center;padding:3px 6px;border-radius:6px}
+.co-cmp-lbl-in{background:rgba(245,166,35,.15);color:var(--amber)}
+.co-cmp-lbl-out{background:rgba(20,184,166,.15);color:var(--teal)}
+.co-cmp-box{position:relative;width:100%;aspect-ratio:4/3;background:var(--surface2);border-radius:10px;overflow:hidden;border:1px solid var(--border)}
+.co-cmp-box-exit{border-color:var(--teal);border-style:dashed}
+.co-cmp-ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--muted);font-size:11px}
 
 /* Period navigator */
 .rp-nav{display:flex;align-items:center;gap:8px;margin-bottom:13px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px 10px}
@@ -515,10 +524,7 @@ select.fi{font-family:'DM Sans',sans-serif;font-size:16px;letter-spacing:0;text-
     </div>
     <div id="scan-acts">
       <button class="btn btn-green" style="width:100%;margin-bottom:9px" onclick="checkIn()">✅ Check In</button>
-      <div style="display:flex;gap:9px">
-        <button class="btn btn-red"  style="flex:1" onclick="showCO(null)">🚪 Check Out by Plate</button>
-        <button class="btn btn-out"  style="flex:1" onclick="startExitCam()">📷 Scan Exit</button>
-      </div>
+      <button class="btn btn-red"   style="width:100%" onclick="showCO(null)">🚪 Check Out by Plate</button>
     </div>
     <!-- session detail shown after tapping active vehicle -->
     <div id="active-sess" style="display:none;margin-top:4px">
@@ -724,136 +730,63 @@ select.fi{font-family:'DM Sans',sans-serif;font-size:16px;letter-spacing:0;text-
   </div>
 </div>
 
-<!-- CHECK-OUT MODAL — 3 steps: Camera → Plate → Decision -->
+<!-- CHECK-OUT MODAL -->
 <div class="mbd" id="co-modal">
   <div class="msh">
     <div class="mh"></div>
+    <div class="mt">Check Out</div>
 
-    <!-- ── STEP 1: Camera ── -->
-    <div id="co-s1" style="display:none">
-      <div class="co-step-lbl"><span class="co-step-num">1</span> Capture exit photo</div>
-      <div class="co-cam-box">
-        <video id="co-video" autoplay playsinline muted></video>
-        <canvas id="co-canvas" style="display:none"></canvas>
-        <img id="co-preview" style="width:100%;height:100%;object-fit:cover;border-radius:10px;display:none">
-        <div id="co-cam-ph" class="co-cam-idle"><div style="font-size:30px">📷</div><div>Tap Start Camera</div></div>
-        <div class="co-cam-badge" id="co-cam-badge" style="display:none">PHOTO CAPTURED</div>
-        <!-- plate frame overlay -->
-        <div id="co-cam-frame" style="display:none;position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center">
-          <div class="pf"><div class="pf-scan"></div></div>
-          <div class="cam-lbl">Align plate here</div>
+    <!-- Photo comparison: CHECK-IN (left) vs EXIT CAMERA (right) -->
+    <div class="co-compare-grid">
+      <div class="co-cmp-col">
+        <div class="co-cmp-lbl co-cmp-lbl-in">📸 Check-In</div>
+        <div class="co-cmp-box" id="co-cmp-in-box">
+          <img id="co-cmp-in-img" style="width:100%;height:100%;object-fit:cover;border-radius:9px;display:none">
+          <div id="co-cmp-in-ph" class="co-cmp-ph"><span style="font-size:22px">📷</span><span>No photo</span></div>
         </div>
       </div>
-      <div style="display:flex;gap:8px;margin-top:8px;margin-bottom:4px">
-        <button class="btn btn-out"   style="flex:1;padding:9px;font-size:13px" id="co-cam-btn" onclick="togExitCam()">▶ Start Camera</button>
-        <button class="btn btn-amber" style="flex:1;padding:9px;font-size:13px" id="co-cap-btn" onclick="capExitPhoto()" disabled>📷 Capture</button>
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:4px">
-        <button class="btn btn-out" style="flex:1;padding:9px;font-size:12px" id="co-recam-btn" onclick="retakeExitPhoto()" style="display:none">↺ Retake</button>
-        <button class="btn btn-green" style="flex:1;padding:9px;font-size:13px" id="co-s1-next" onclick="goCoStep(2)" disabled>Next →</button>
-      </div>
-      <button class="btn btn-out" style="width:100%;padding:9px;font-size:12px;margin-top:2px" onclick="closeCO()">Cancel</button>
-    </div>
-
-    <!-- ── STEP 2: Plate confirm ── -->
-    <div id="co-s2" style="display:none">
-      <div class="co-step-lbl"><span class="co-step-num">2</span> Confirm license plate from photo</div>
-      <!-- thumbnail of captured photo -->
-      <div style="margin-bottom:12px;border-radius:10px;overflow:hidden;max-height:140px">
-        <img id="co-s2-thumb" style="width:100%;object-fit:cover;max-height:140px;display:block;border-radius:10px">
-      </div>
-      <div class="fw" style="margin-bottom:8px">
-        <div class="lbl">License Plate (read from photo)</div>
-        <input class="fi" id="co-plate" type="text" placeholder="ABC·1234" maxlength="10"
-               oninput="this.value=this.value.toUpperCase();lookupP()">
-      </div>
-      <div id="co-lookup-msg" style="font-size:13px;text-align:center;padding:4px 0;min-height:18px;margin-bottom:8px"></div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-out"   style="flex:1;padding:9px;font-size:13px" onclick="goCoStep(1)">← Back</button>
-        <button class="btn btn-green" style="flex:1;padding:9px;font-size:13px" id="co-s2-next" onclick="goCoStep(3)" disabled>Next →</button>
-      </div>
-    </div>
-
-    <!-- ── STEP 3: Charge / Free decision ── -->
-    <div id="co-s3" style="display:none">
-      <div class="co-step-lbl"><span class="co-step-num">3</span> Confirm payment</div>
-      <!-- session summary with thumbnail -->
-      <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start">
-        <img id="co-s3-thumb" style="width:72px;height:54px;object-fit:cover;border-radius:8px;flex-shrink:0">
-        <div class="sc" id="co-mini-info" style="flex:1;margin-bottom:0;min-height:0"></div>
-      </div>
-
-      <div class="co-choice">
-        <div class="co-choice-btn charge" id="choice-charge" onclick="selectChoice('charge')">
-          <div class="ch-icon">💳</div>
-          <div class="ch-label">Charge</div>
-          <div class="ch-sub" id="choice-charge-sub">—</div>
-        </div>
-        <div class="co-choice-btn free" id="choice-free" onclick="selectChoice('free')">
-          <div class="ch-icon">🎟️</div>
-          <div class="ch-label">Free</div>
-          <div class="ch-sub" id="choice-free-sub">—</div>
-        </div>
-      </div>
-
-      <div id="co-result-box" style="display:none"></div>
-
-      <div id="co-reason-wrap" style="display:none;margin-bottom:10px">
-        <div class="lbl">Reason for free <span style="color:var(--muted)">(required)</span></div>
-        <input class="fi-sm" id="co-reason" type="text" placeholder="e.g. VIP, Staff, Empty space…">
-      </div>
-
-      <div style="display:flex;gap:9px;margin-top:4px">
-        <button class="btn btn-out" style="flex:1;padding:10px" onclick="goCoStep(2)">← Back</button>
-        <button class="btn btn-red" style="flex:1;padding:10px" id="co-ok" onclick="confCO()" disabled>✅ Confirm</button>
-      </div>
-    </div>
-
-    <!-- ── BYPASS: direct checkout from Active/Records (no camera required) ── -->
-    <div id="co-direct" style="display:none">
-      <div class="co-step-lbl" style="margin-bottom:8px">Direct Check Out</div>
-      <!-- optional exit photo strip -->
-      <div id="co-direct-cam-area" style="margin-bottom:10px">
-        <div class="co-cam-box" style="height:120px">
-          <video id="co-video2" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;border-radius:10px;display:none"></video>
+      <div class="co-cmp-col">
+        <div class="co-cmp-lbl co-cmp-lbl-out">🚪 Exit Now</div>
+        <div class="co-cmp-box co-cmp-box-exit">
+          <video id="co-video2" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;border-radius:9px;display:none"></video>
           <canvas id="co-canvas2" style="display:none"></canvas>
-          <img id="co-preview2" style="width:100%;height:100%;object-fit:cover;border-radius:10px;display:none">
-          <div id="co-cam-ph2" class="co-cam-idle" style="height:100%;font-size:12px"><div style="font-size:22px">📷</div><div>Optional exit photo</div></div>
-          <div class="co-cam-badge" id="co-cam-badge2" style="display:none">PHOTO SAVED</div>
+          <img id="co-preview2" style="width:100%;height:100%;object-fit:cover;border-radius:9px;display:none">
+          <div id="co-cam-ph2" class="co-cmp-ph"><span style="font-size:22px">📷</span><span>Tap Start</span></div>
+          <div class="co-cam-badge" id="co-cam-badge2" style="display:none">SAVED</div>
         </div>
-        <div style="display:flex;gap:7px;margin-top:7px">
-          <button class="btn btn-out"   style="flex:1;padding:7px;font-size:12px" id="co-cam-btn2" onclick="togExitCam2()">▶ Camera</button>
-          <button class="btn btn-amber" style="flex:1;padding:7px;font-size:12px" id="co-cap-btn2" onclick="capExitPhoto2()" disabled>📷 Capture</button>
-          <button class="btn btn-out"   style="flex:1;padding:7px;font-size:12px" id="co-recam-btn2" onclick="retakeExitPhoto2()" style="display:none">↺ Retake</button>
-        </div>
-      </div>
-
-      <div class="sc" id="co-direct-info" style="margin-bottom:10px"></div>
-
-      <div class="co-choice">
-        <div class="co-choice-btn charge" id="choice-charge2" onclick="selectChoice2('charge')">
-          <div class="ch-icon">💳</div>
-          <div class="ch-label">Charge</div>
-          <div class="ch-sub" id="choice-charge-sub2">—</div>
-        </div>
-        <div class="co-choice-btn free" id="choice-free2" onclick="selectChoice2('free')">
-          <div class="ch-icon">🎟️</div>
-          <div class="ch-label">Free</div>
-          <div class="ch-sub" id="choice-free-sub2">—</div>
+        <div style="display:flex;gap:5px;margin-top:5px">
+          <button class="btn btn-out"   style="flex:1;padding:6px;font-size:11px;min-height:34px" id="co-cam-btn2"   onclick="togExitCam2()">▶ Start</button>
+          <button class="btn btn-amber" style="flex:1;padding:6px;font-size:11px;min-height:34px" id="co-cap-btn2"   onclick="capExitPhoto2()" disabled>📷 Capture</button>
+          <button class="btn btn-out"   style="flex:1;padding:6px;font-size:11px;min-height:34px;display:none" id="co-recam-btn2" onclick="retakeExitPhoto2()">↺ Redo</button>
         </div>
       </div>
+    </div>
 
-      <div id="co-result-box2" style="display:none"></div>
+    <!-- Session info -->
+    <div id="co-direct-info" style="margin-bottom:10px"></div>
 
-      <div id="co-reason-wrap2" style="display:none;margin-bottom:10px">
-        <div class="lbl">Reason for free <span style="color:var(--muted)">(required)</span></div>
-        <input class="fi-sm" id="co-reason2" type="text" placeholder="e.g. VIP, Staff, Empty space…">
+    <!-- Charge / Free -->
+    <div class="co-choice">
+      <div class="co-choice-btn charge" id="choice-charge2" onclick="selectChoice2('charge')">
+        <div class="ch-icon">💳</div><div class="ch-label">Charge</div>
+        <div class="ch-sub" id="choice-charge-sub2">—</div>
       </div>
-
-      <div style="display:flex;gap:9px;margin-top:4px">
-        <button class="btn btn-out" style="flex:1;padding:10px" onclick="closeCO()">Cancel</button>
-        <button class="btn btn-red" style="flex:1;padding:10px" id="co-ok2" onclick="confCO2()" disabled>✅ Confirm</button>
+      <div class="co-choice-btn free" id="choice-free2" onclick="selectChoice2('free')">
+        <div class="ch-icon">🎟️</div><div class="ch-label">Free</div>
+        <div class="ch-sub" id="choice-free-sub2">—</div>
       </div>
+    </div>
+
+    <div id="co-result-box2" style="display:none"></div>
+
+    <div id="co-reason-wrap2" style="display:none;margin-bottom:10px">
+      <div class="lbl">Reason for free <span style="color:var(--muted)">(required)</span></div>
+      <input class="fi-sm" id="co-reason2" type="text" placeholder="e.g. VIP, Staff, Empty space…">
+    </div>
+
+    <div style="display:flex;gap:9px;margin-top:4px">
+      <button class="btn btn-out" style="flex:1;padding:10px" onclick="closeCO()">Cancel</button>
+      <button class="btn btn-red" style="flex:1;padding:10px" id="co-ok2" onclick="confCO2()" disabled>✅ Confirm</button>
     </div>
 
   </div>
@@ -867,6 +800,23 @@ select.fi{font-family:'DM Sans',sans-serif;font-size:16px;letter-spacing:0;text-
     <div id="vh-stats" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"></div>
     <div id="vh-list" style="max-height:55vh;overflow-y:auto"></div>
     <button class="btn btn-out" style="width:100%;margin-top:12px" onclick="closeVH()">Close</button>
+  </div>
+</div>
+
+<!-- PLATE SEARCH MODAL -->
+<div class="mbd" id="ps-modal">
+  <div class="msh">
+    <div class="mh"></div>
+    <div class="mt">Find Vehicle</div>
+    <div style="position:relative;margin-bottom:10px">
+      <input class="fi" id="ps-inp" type="text" placeholder="Plate or last 3 digits…" maxlength="10"
+             oninput="this.value=this.value.toUpperCase();renderPSearch()"
+             style="font-size:18px;letter-spacing:2px;padding-right:40px">
+      <button onclick="document.getElementById('ps-inp').value='';renderPSearch()" 
+              style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer">✕</button>
+    </div>
+    <div id="ps-results" style="max-height:50vh;overflow-y:auto"></div>
+    <button class="btn btn-out" style="width:100%;margin-top:10px" onclick="closePSearch()">Cancel</button>
   </div>
 </div>
 
@@ -1119,32 +1069,94 @@ function showCO(sessId, _unused){
   coSessId=sessId||null; coChoice=null; coChoice2=null;
   exitPhoto=null; exitPhoto2=null;
   stopExitCamSilent();
-  resetCamUI();
   resetCamUI2();
-  resetChoiceUI('');
   resetChoiceUI('2');
+  document.getElementById('co-result-box2').style.display='none';
+  document.getElementById('co-reason-wrap2').style.display='none';
+  document.getElementById('co-ok2').disabled=true;
+  ['choice-charge2','choice-free2'].forEach(id=>document.getElementById(id)?.classList.remove('selected'));
 
   if(sessId){
-    // Direct checkout — no camera step required (camera is optional inside direct panel)
-    coShowOnly('co-direct');
     renderDirectPanel(sessId);
+    document.getElementById('co-modal').classList.add('open');
   } else {
-    // Camera scan flow — start at step 1
-    coShowOnly('co-s1');
-    setTimeout(()=>startExitCamStream(), 150);
+    // Open plate search modal — user picks from live results
+    openPSearch();
   }
-  document.getElementById('co-modal').classList.add('open');
 }
-
-// Called from "📷 Scan Exit" on scan tab
-function startExitCam(){ showCO(null); }
-// Called from session detail "Check Out This Vehicle"
+function startExitCam(){ /* removed — use Out buttons on Active tab */ }
 function openCOforCur(){ if(!curSessId) return; hideSessDet(); showCO(curSessId); }
 
 function closeCO(){
   stopExitCamSilent(); exitPhoto=null; exitPhoto2=null;
   document.getElementById('co-modal').classList.remove('open');
   coSessId=null; coChoice=null; coChoice2=null;
+}
+
+// ── PLATE SEARCH MODAL ────────────────
+function openPSearch(){
+  document.getElementById('ps-inp').value='';
+  renderPSearch();
+  document.getElementById('ps-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('ps-inp').focus(),200);
+}
+function closePSearch(){ document.getElementById('ps-modal').classList.remove('open'); }
+
+function renderPSearch(){
+  const q=document.getElementById('ps-inp').value.trim().toUpperCase();
+  const active=state.records.filter(r=>r.st==='active');
+  // match: last N digits/chars, OR anywhere in plate
+  const matched = q.length===0 ? active
+    : active.filter(r=>{
+        if(r.plate.includes(q)) return true;           // full substring match
+        if(q.length<=4 && r.plate.endsWith(q)) return true; // last 3-4 chars
+        return false;
+      });
+
+  const con=document.getElementById('ps-results');
+  if(!matched.length){
+    con.innerHTML=`<div style="text-align:center;padding:20px;color:var(--muted);font-size:14px">${q?'No active vehicle matching "'+q+'"':'No active sessions'}</div>`;
+    return;
+  }
+  con.innerHTML=matched.map(r=>{
+    const dur=getDur(r.ci,Date.now());
+    const fee=fmtFee(calcFee(r.ci,Date.now(),r.vt));
+    // highlight matching part
+    let plateHtml=r.plate;
+    if(q&&r.plate.includes(q)){
+      plateHtml=r.plate.replace(q,`<mark style="background:rgba(245,166,35,.35);color:var(--amber);border-radius:3px;padding:0 2px">${q}</mark>`);
+    }
+    const thumb=r.img?`<img src="${r.img}" style="width:44px;height:34px;object-fit:cover;border-radius:7px;flex-shrink:0">`
+      :`<div style="width:44px;height:34px;border-radius:7px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${r.vt==='moto'?'🏍️':'🚗'}</div>`;
+    return `<div onclick="selectFromSearch('${r.id}')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--border);border-radius:12px;margin-bottom:7px;cursor:pointer;background:var(--surface);active:opacity:.8">
+      ${thumb}
+      <div style="flex:1;min-width:0">
+        <div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:600;letter-spacing:1.5px">${plateHtml}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">In ${fmtDT(r.ci)} · ${dur}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="color:var(--amber);font-family:'DM Mono',monospace;font-size:14px;font-weight:600">${fee}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">${r.vt==='moto'?'Moto':'Car'}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function selectFromSearch(id){
+  closePSearch();
+  const rec=state.records.find(r=>r.id===id); if(!rec) return;
+  coSessId=id;
+  // reset checkout modal state
+  exitPhoto=null; exitPhoto2=null;
+  stopExitCamSilent();
+  resetCamUI2();
+  resetChoiceUI('2');
+  document.getElementById('co-result-box2').style.display='none';
+  document.getElementById('co-reason-wrap2').style.display='none';
+  document.getElementById('co-ok2').disabled=true;
+  ['choice-charge2','choice-free2'].forEach(id=>document.getElementById(id)?.classList.remove('selected'));
+  renderDirectPanel(id);
+  document.getElementById('co-modal').classList.add('open');
 }
 
 // ── STEP NAVIGATION ──────────────────
@@ -1250,16 +1262,24 @@ function lookupP(){
 function renderCOSession(sid){
   const rec=state.records.find(r=>r.id===sid); if(!rec) return;
   const dur=getDur(rec.ci,Date.now()), fee=calcFee(rec.ci,Date.now(),rec.vt);
-  // show exit photo thumbnail in step 3
-  const t3=document.getElementById('co-s3-thumb');
-  if(exitPhoto) t3.src=exitPhoto;
-  else if(rec.img) t3.src=rec.img;
-  else { t3.style.display='none'; }
+
+  // Check-in photo (left slot)
+  const inImg=document.getElementById('co-s3-in-img');
+  const inPh =document.getElementById('co-s3-in-ph');
+  if(rec.img && inImg){ inImg.src=rec.img; inImg.style.display='block'; if(inPh) inPh.style.display='none'; }
+  else { if(inImg) inImg.style.display='none'; if(inPh) inPh.style.display='flex'; }
+
+  // Exit photo (right slot) — from exitPhoto captured in step 1
+  const exImg=document.getElementById('co-s3-thumb');
+  const exPh =document.getElementById('co-s3-exit-ph');
+  if(exitPhoto && exImg){ exImg.src=exitPhoto; exImg.style.display='block'; if(exPh) exPh.style.display='none'; }
+  else { if(exImg) exImg.style.display='none'; if(exPh) exPh.style.display='flex'; }
+
   document.getElementById('co-mini-info').innerHTML=`
     <div class="sr"><span>Plate</span><span class="val">${rec.plate}</span></div>
     <div class="sr"><span>Type</span><span class="val">${rec.vt==='moto'?'🏍️ Moto':'🚗 Car'}</span></div>
     <div class="sr"><span>Check-in</span><span class="val">${fmtDT(rec.ci)}</span></div>
-    <div class="sr"><span>Duration</span><span class="val">${dur}</span></div>`;
+    <div class="sr" style="border:none"><span>Duration</span><span class="val">${dur}</span></div>`;
   document.getElementById('choice-charge-sub').textContent=fmtFee(fee);
   document.getElementById('choice-free-sub').textContent='Waive '+fmtFee(fee);
 }
@@ -1313,25 +1333,31 @@ function confCO(){
 function renderDirectPanel(sid){
   const rec=state.records.find(r=>r.id===sid); if(!rec) return;
   const dur=getDur(rec.ci,Date.now()), fee=calcFee(rec.ci,Date.now(),rec.vt);
-  // show check-in photo for comparison if it exists
-  const photoHtml = rec.img ? `
-    <div style="margin-bottom:10px">
-      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:5px;font-weight:600">Check-in Photo — Verify Vehicle</div>
-      <div style="border-radius:10px;overflow:hidden;max-height:160px;cursor:pointer;position:relative" onclick="viewCompare('${rec.id}')">
-        <img src="${rec.img}" style="width:100%;object-fit:cover;max-height:160px;display:block;border-radius:10px">
-        <div style="position:absolute;bottom:6px;right:8px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;letter-spacing:.5px">TAP TO ENLARGE</div>
-      </div>
-    </div>` : '';
+
+  // Load check-in photo into comparison grid left side
+  const inImg=document.getElementById('co-cmp-in-img');
+  const inPh =document.getElementById('co-cmp-in-ph');
+  if(rec.img && inImg){
+    inImg.src=rec.img; inImg.style.display='block';
+    if(inPh) inPh.style.display='none';
+  } else {
+    if(inImg) inImg.style.display='none';
+    if(inPh)  inPh.style.display='flex';
+  }
+
+  // Session info (compact, no photo since it's in the grid)
   document.getElementById('co-direct-info').innerHTML=`
-    ${photoHtml}
-    <div class="sc" style="margin-bottom:10px">
+    <div class="sc" style="margin-bottom:0">
       <div class="sr"><span>Plate</span><span class="val">${rec.plate}</span></div>
       <div class="sr"><span>Type</span><span class="val">${rec.vt==='moto'?'🏍️ Moto':'🚗 Car'}</span></div>
       <div class="sr"><span>Check-in</span><span class="val">${fmtDT(rec.ci)}</span></div>
-      <div class="sr"><span>Duration</span><span class="val">${dur}</span></div>
+      <div class="sr" style="border:none"><span>Duration</span><span class="val">${dur}</span></div>
     </div>`;
   document.getElementById('choice-charge-sub2').textContent=fmtFee(fee);
   document.getElementById('choice-free-sub2').textContent='Waive '+fmtFee(fee);
+
+  // Auto-start exit camera
+  setTimeout(()=>startExitCamStream2(), 200);
 }
 
 async function togExitCam2(){ exitCamOn2?stopExitCam2():await startExitCamStream2(); }
@@ -1362,6 +1388,7 @@ function capExitPhoto2(){
   document.getElementById('co-cam-badge2').style.display='block';
   document.getElementById('co-recam-btn2').style.display='flex';
   stopExitCam2();
+  showToast('Exit photo captured','ok');
 }
 function retakeExitPhoto2(){
   exitPhoto2=null;
@@ -1376,8 +1403,11 @@ function resetCamUI2(){
   const b=document.getElementById('co-cam-badge2'); if(b) b.style.display='none';
   const ph=document.getElementById('co-cam-ph2'); if(ph) ph.style.display='flex';
   const rb=document.getElementById('co-recam-btn2'); if(rb) rb.style.display='none';
-  const cb=document.getElementById('co-cam-btn2'); if(cb) cb.textContent='▶ Camera';
+  const cb=document.getElementById('co-cam-btn2'); if(cb) cb.textContent='▶ Start';
   const cp=document.getElementById('co-cap-btn2'); if(cp) cp.disabled=true;
+  // reset comparison grid left (check-in photo) — will be re-populated on open
+  const inImg=document.getElementById('co-cmp-in-img'); if(inImg){inImg.style.display='none'; inImg.src='';}
+  const inPh=document.getElementById('co-cmp-in-ph'); if(inPh) inPh.style.display='flex';
 }
 
 function selectChoice2(ch){
