@@ -570,8 +570,9 @@ select.fi{font-family:'DM Sans',sans-serif;font-size:16px;letter-spacing:0;text-
   <!-- ══ RECORDS (admin) ══ -->
   <div id="screen-records" class="screen">
     <div class="rtbar">
-      <input class="srch" id="srch" placeholder="Search plate…" oninput="renderRecs()">
+      <input class="srch" id="srch" placeholder="Search plate…" oninput="renderRecs()" style="flex:1">
       <button class="flt-btn" id="flt-btn" onclick="togRecFlt()">⏱</button>
+      <button onclick="exportPhotoReportFromRecords()" style="padding:7px 11px;border-radius:10px;border:1px solid rgba(59,130,246,.35);background:rgba(59,130,246,.1);color:var(--blue);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">📷 Photos</button>
     </div>
     <div id="rec-list"></div>
   </div>
@@ -2478,36 +2479,41 @@ function goTab(n){
 }
 
 // ── PHOTO REPORT (HTML with inline images) ────────────────────────────
-function exportPhotoReport(){
-  const recs = getFilteredDone().sort((a,b)=>b.co-a.co);
-  if(!recs.length){ showToast('No sessions for this period','err'); return; }
+function buildPhotoReportHTML(recs, title){
+  const fDate=(ts)=>{ const d=new Date(ts); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; };
+  const fTime=(ts)=>{ const d=new Date(ts); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+  const fDur =(ci,co)=>{ if(!co) return ''; const ms=co-ci,h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000); return h>0?`${h}h ${m}m`:`${m}m`; };
+  const fDT  =(ts)=>`${fDate(ts)} ${fTime(ts)}`;
 
-  const rows = recs.map(r=>{
-    const dur=fDur(r.ci,r.co);
-    const feeStr=r.free?`<span style="color:#14B8A6;font-weight:700">FREE</span> <span style="color:#6B7280;font-size:12px">Waived ${(r.feeWaived||0).toLocaleString('vi-VN')}₫</span>`
+  const rows=recs.map(r=>{
+    const dur=fDur(r.ci,r.co||Date.now());
+    const feeStr=r.free
+      ?`<span style="color:#14B8A6;font-weight:700">FREE</span> <span style="color:#6B7280;font-size:12px">Waived ${(r.feeWaived||0).toLocaleString('vi-VN')}₫</span>`
       :`<span style="color:#F5A623;font-weight:700">${(r.fee||0).toLocaleString('vi-VN')} ₫</span>`;
     const inPhoto=r.img
       ?`<img src="${r.img}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`
       :`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:12px;flex-direction:column;gap:4px"><span style="font-size:24px">📷</span>No photo</div>`;
     const outPhoto=r.imgOut
       ?`<img src="${r.imgOut}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`
-      :`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:12px;flex-direction:column;gap:4px"><span style="font-size:24px">📷</span>No photo</div>`;
+      :`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:12px;flex-direction:column;gap:4px"><span style="font-size:24px">📷</span>${r.st==='active'?'Active':'No photo'}</div>`;
+    const statusBadge=r.st==='active'
+      ?`<span style="background:rgba(34,197,94,.2);color:#22C55E;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:8px">ACTIVE</span>`:'';
     return `
       <div style="background:#1A1D27;border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:14px;margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
           <div>
-            <div style="font-family:monospace;font-size:18px;font-weight:700;letter-spacing:2px;color:#F0F2FF">${r.plate}</div>
+            <span style="font-family:monospace;font-size:18px;font-weight:700;letter-spacing:2px;color:#F0F2FF">${r.plate}</span>${statusBadge}
             <div style="font-size:12px;color:#7B82A0;margin-top:2px">${r.vt==='moto'?'🏍️ Motorcycle':'🚗 Car'} · ${dur}</div>
           </div>
           <div style="text-align:right">${feeStr}</div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div>
-            <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:#F5A623;background:rgba(245,166,35,.15);padding:2px 8px;border-radius:5px;margin-bottom:5px;display:inline-block">📸 CHECK IN · ${fDate(r.ci)} ${fTime(r.ci)}</div>
+            <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:#F5A623;background:rgba(245,166,35,.15);padding:2px 8px;border-radius:5px;margin-bottom:5px;display:inline-block">📸 IN · ${fDate(r.ci)} ${fTime(r.ci)}</div>
             <div style="width:100%;aspect-ratio:4/3;background:#0F1117;border:1px solid rgba(245,166,35,.3);border-radius:8px;overflow:hidden">${inPhoto}</div>
           </div>
           <div>
-            <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:#14B8A6;background:rgba(20,184,166,.15);padding:2px 8px;border-radius:5px;margin-bottom:5px;display:inline-block">🚪 CHECK OUT · ${r.co?fDate(r.co)+' '+fTime(r.co):'—'}</div>
+            <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:#14B8A6;background:rgba(20,184,166,.15);padding:2px 8px;border-radius:5px;margin-bottom:5px;display:inline-block">🚪 OUT · ${r.co?fDate(r.co)+' '+fTime(r.co):'—'}</div>
             <div style="width:100%;aspect-ratio:4/3;background:#0F1117;border:1px solid rgba(20,184,166,.3);border-radius:8px;overflow:hidden">${outPhoto}</div>
           </div>
         </div>
@@ -2515,30 +2521,53 @@ function exportPhotoReport(){
       </div>`;
   }).join('');
 
-  let periodLabel='';
-  if(rpMode==='day')   periodLabel=fmtPK(selectedPeriod,'day');
-  if(rpMode==='week')  periodLabel='Week '+fmtPK(selectedPeriod,'week');
-  if(rpMode==='month') periodLabel=fmtPK(selectedPeriod,'month');
-
-  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ParkScan Photo Report — ${periodLabel}</title></head>
+<title>ParkScan Photo Report — ${title}</title></head>
 <body style="background:#0F1117;color:#F0F2FF;font-family:'Segoe UI',sans-serif;padding:16px;max-width:500px;margin:0 auto">
   <div style="text-align:center;margin-bottom:20px">
     <div style="font-size:24px;font-weight:900;letter-spacing:3px;color:#F5A623">PARK<span style="color:#F0F2FF">SCAN</span></div>
-    <div style="font-size:14px;color:#7B82A0;margin-top:4px">Photo Report · ${periodLabel}</div>
+    <div style="font-size:14px;color:#7B82A0;margin-top:4px">Photo Report · ${title}</div>
     <div style="font-size:12px;color:#7B82A0">Generated: ${fDT(Date.now())} · ${recs.length} vehicles</div>
   </div>
   ${rows}
 </body></html>`;
+}
 
+function downloadHTMLReport(html, filename){
   const blob=new Blob([html],{type:'text/html'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='ParkScan_Photos_'+periodLabel.replace(/[\/\s–]/g,'-')+'_'+new Date().toISOString().slice(0,10)+'.html';
+  a.download=filename;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+// Called from Reports tab — uses selected period filter
+function exportPhotoReport(){
+  const recs=getFilteredDone().sort((a,b)=>b.co-a.co);
+  if(!recs.length){ showToast('No sessions for this period','err'); return; }
+  let periodLabel='';
+  if(rpMode==='day')   periodLabel=fmtPK(selectedPeriod,'day');
+  if(rpMode==='week')  periodLabel='Week '+fmtPK(selectedPeriod,'week');
+  if(rpMode==='month') periodLabel=fmtPK(selectedPeriod,'month');
+  const html=buildPhotoReportHTML(recs, periodLabel);
+  downloadHTMLReport(html,'ParkScan_Photos_'+periodLabel.replace(/[\/\s–]/g,'-')+'_'+new Date().toISOString().slice(0,10)+'.html');
   showToast('📷 Photo report downloaded','ok');
+}
+
+// Called from Records tab — uses current search/filter
+function exportPhotoReportFromRecords(){
+  const srch=(document.getElementById('srch')?.value||'').trim().toUpperCase();
+  let recs=[...state.records];
+  if(recFlt) recs=recs.filter(r=>r.st==='active');
+  if(srch) recs=recs.filter(r=>r.plate.includes(srch));
+  recs=recs.sort((a,b)=>b.ci-a.ci);
+  if(!recs.length){ showToast('No records to export','err'); return; }
+  const label=srch?'Search: '+srch:recFlt?'Active':'All Records';
+  const html=buildPhotoReportHTML(recs, label);
+  downloadHTMLReport(html,'ParkScan_Photos_Records_'+new Date().toISOString().slice(0,10)+'.html');
+  showToast('📷 Photo report downloaded ('+recs.length+' records)','ok');
 }
 // ═══════════════════════════════════════
 let isDark = ls.g('ps_theme','dark') !== 'light';
