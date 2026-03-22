@@ -601,7 +601,10 @@ select.fi{font-family:'DM Sans',sans-serif;font-size:16px;letter-spacing:0;text-
 
     <!-- Summary boxes -->
     <div class="rp-sum" id="rp-sum"></div>
-    <button class="exp-btn" onclick="exportExcel()">⬇️ Export to Excel (.xlsx)</button>
+    <div style="display:flex;gap:8px;margin-bottom:9px">
+      <button class="exp-btn" style="flex:1;margin-bottom:0" onclick="exportExcel()">⬇️ Export Excel</button>
+      <button class="exp-btn" style="flex:1;margin-bottom:0;background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:var(--blue)" onclick="exportPhotoReport()">📷 Photo Report</button>
+    </div>
     <div id="rp-rows"></div>
   </div>
 
@@ -734,6 +737,16 @@ select.fi{font-family:'DM Sans',sans-serif;font-size:16px;letter-spacing:0;text-
         To restore on a new device: open the app → tap <em>Load Backup</em> → pick the saved file.<br>
         <span style="color:var(--amber)">Tip: save a backup every day or after busy sessions.</span>
       </div>
+
+      <!-- Auto-backup toggle -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding:10px 13px;background:var(--surface);border:1px solid var(--border);border-radius:10px">
+        <div>
+          <div style="font-size:13px;font-weight:500">⏰ Auto-backup every hour</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px" id="auto-backup-sub">Saves to browser memory, not a file</div>
+        </div>
+        <button id="auto-backup-toggle" onclick="toggleAutoBackup()" style="padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;min-width:52px">OFF</button>
+      </div>
+      <button id="auto-backup-download" onclick="downloadAutoBackup()" style="display:none;width:100%;margin-top:7px;padding:10px;border-radius:10px;border:1px solid rgba(34,197,94,.3);background:rgba(34,197,94,.08);color:var(--green);font-size:13px;font-weight:600;cursor:pointer">⬇️ Download latest auto-backup</button>
     </div>
 
     <button class="btn btn-amber" style="width:100%;margin-bottom:8px;flex:none" id="save-btn" onclick="saveSets()" disabled>Save All Changes</button>
@@ -1941,7 +1954,7 @@ function exportExcel(){
       [`Generated: ${fDT(Date.now())}   |   Vehicles: ${recs.length}   |   Charged sessions: ${recs.filter(r=>!r.free).length}   |   Free sessions: ${recs.filter(r=>r.free).length}`],
       [`Total collected: ${fFee(tCh)} VND   |   Total waived: ${fFee(tWv)} VND`],
       [],
-      ['No.','Date','Day','Plate','Vehicle','Check-In','Check-Out','Duration','Hours (billed)','Type','Rate (VND/hr)','Charged (VND)','Waived (VND)','Reason','Overnight']
+      ['No.','Date','Day','Plate','Vehicle','Check-In','Check-Out','Duration','Hours (billed)','Type','Rate (VND/hr)','Charged (VND)','Waived (VND)','Reason','Overnight','Photo IN','Photo OUT']
     ];
 
     recs.forEach((r,i)=>{
@@ -1962,20 +1975,22 @@ function exportExcel(){
         r.free?0:r.fee,
         r.free?(r.feeWaived||0):0,
         r.reason||'',
-        fOvn(r)?'YES':''
+        fOvn(r)?'YES':'',
+        r.img?'YES':'NO',
+        r.imgOut?'YES':'NO'
       ]);
     });
 
     data.push([]);
     data.push(['TOTAL','','','','','','','','',
       `${recs.filter(r=>!r.free).length} charged / ${recs.filter(r=>r.free).length} free`,
-      '','CHARGED: '+fFee(tCh),'WAIVED: '+fFee(tWv),'','']);
+      '','CHARGED: '+fFee(tCh),'WAIVED: '+fFee(tWv),'','','','']);
 
-    const ws=makeSheet(data,[4,12,5,13,12,10,10,10,13,8,13,15,15,26,10]);
+    const ws=makeSheet(data,[4,12,5,13,12,10,10,10,13,8,13,15,15,26,10,10,10]);
     ws['!merges']=[
-      {s:{r:0,c:0},e:{r:0,c:14}},
-      {s:{r:1,c:0},e:{r:1,c:14}},
-      {s:{r:2,c:0},e:{r:2,c:14}},
+      {s:{r:0,c:0},e:{r:0,c:16}},
+      {s:{r:1,c:0},e:{r:1,c:16}},
+      {s:{r:2,c:0},e:{r:2,c:16}},
     ];
     XLSX.utils.book_append_sheet(wb,ws,('Daily '+pl).slice(0,31));
   }
@@ -2077,7 +2092,7 @@ function exportExcel(){
   if(isAdmin){
     const data=[
       ['No.','Plate','Vehicle','Check-In Date','Check-In Time','Check-Out Date','Check-Out Time',
-       'Duration','Hours','Type','Rate (VND/hr)','Charged (VND)','Waived (VND)','Reason','Overnight','Status']
+       'Duration','Hours','Type','Rate (VND/hr)','Charged (VND)','Waived (VND)','Reason','Overnight','Status','Photo IN','Photo OUT']
     ];
     state.records.forEach((r,i)=>{
       const rate=r.vt==='moto'?cfg.feeMoto:cfg.feeCar;
@@ -2095,10 +2110,12 @@ function exportExcel(){
         r.free?(r.feeWaived||0):0,
         r.reason||'',
         on?'YES':'',
-        r.st==='active'?'Active':'Done'
+        r.st==='active'?'Active':'Done',
+        r.img?'YES':'NO',
+        r.imgOut?'YES':'NO'
       ]);
     });
-    const ws=makeSheet(data,[5,13,12,13,11,13,11,10,7,8,13,15,15,26,10,8]);
+    const ws=makeSheet(data,[5,13,12,13,11,13,11,10,7,8,13,15,15,26,10,8,10,10]);
     XLSX.utils.book_append_sheet(wb,ws,'All Records');
   }
 
@@ -2130,6 +2147,7 @@ function renderSets(){
   if(secCur) secCur.textContent=creds.secQ?('Current question set: "'+creds.secQ+'"'):'⚠️ No security question set — you cannot reset your password if forgotten!';
   renderDriveStatus();
   updateBackupStatus();
+  renderAutoBackupUI();
   renderFP();
 }
 function renderFP(){
@@ -2365,7 +2383,80 @@ function updateBackupStatus(){
 
 
 // ═══════════════════════════════════════
-//  TABS
+//  AUTO-BACKUP (save to localStorage every hour)
+// ═══════════════════════════════════════
+let autoBackupEnabled = ls.g('ps_auto_backup', false);
+let autoBackupTimer = null;
+
+function toggleAutoBackup(){
+  autoBackupEnabled = !autoBackupEnabled;
+  ls.s('ps_auto_backup', autoBackupEnabled);
+  renderAutoBackupUI();
+  if(autoBackupEnabled){
+    doAutoBackup();
+    showToast('⏰ Auto-backup ON — saves every hour','ok');
+  } else {
+    showToast('Auto-backup disabled','info');
+  }
+}
+
+function doAutoBackup(){
+  if(!autoBackupEnabled) return;
+  try{
+    const data={v:3,ts:Date.now(),cfg,creds,records:state.records};
+    // Store in localStorage (separate key from manual backup)
+    ls.s('ps_auto_snap', data);
+    ls.s('ps_auto_snap_time', Date.now());
+    renderAutoBackupUI();
+    console.log('Auto-backup saved at', new Date().toLocaleTimeString());
+  }catch(e){ console.warn('Auto-backup failed:', e); }
+}
+
+function downloadAutoBackup(){
+  const snap = ls.g('ps_auto_snap', null);
+  if(!snap){ showToast('No auto-backup found','err'); return; }
+  const blob=new Blob([JSON.stringify(snap)],{type:'application/json'});
+  const ts=new Date(snap.ts||Date.now()).toISOString().slice(0,16).replace('T','_').replace(':','h');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='ParkScan_AutoBackup_'+ts+'.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('💾 Auto-backup downloaded','ok');
+}
+
+function renderAutoBackupUI(){
+  const btn = document.getElementById('auto-backup-toggle');
+  const sub = document.getElementById('auto-backup-sub');
+  const dlBtn = document.getElementById('auto-backup-download');
+  if(!btn) return;
+
+  if(autoBackupEnabled){
+    btn.textContent='ON';
+    btn.style.background='rgba(34,197,94,.15)';
+    btn.style.borderColor='rgba(34,197,94,.4)';
+    btn.style.color='var(--green)';
+    const snapTime = ls.g('ps_auto_snap_time', null);
+    if(snapTime){
+      const fmtT=new Date(snapTime).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});
+      const fmtD=new Date(snapTime).toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit'});
+      sub.textContent='Last auto-save: '+fmtD+' '+fmtT+' · saves every hour';
+    } else {
+      sub.textContent='Will save in the next minute';
+    }
+    if(dlBtn) dlBtn.style.display='block';
+  } else {
+    btn.textContent='OFF';
+    btn.style.background='var(--surface2)';
+    btn.style.borderColor='var(--border)';
+    btn.style.color='var(--muted)';
+    sub.textContent='Saves to browser memory, not a file';
+    if(dlBtn) dlBtn.style.display='none';
+  }
+}
+
+// Run auto-backup on startup if enabled
+if(autoBackupEnabled) setTimeout(doAutoBackup, 5000);
 // ═══════════════════════════════════════
 function goTab(n){
   if((n==='records'||n==='settings')&&!PERMS[role]?.[n]){ showToast('Admin only','err'); return; }
@@ -2386,8 +2477,69 @@ function goTab(n){
   if(n==='settings'){ pend={...cfg}; renderSets(); }
 }
 
-// ═══════════════════════════════════════
-//  THEME TOGGLE
+// ── PHOTO REPORT (HTML with inline images) ────────────────────────────
+function exportPhotoReport(){
+  const recs = getFilteredDone().sort((a,b)=>b.co-a.co);
+  if(!recs.length){ showToast('No sessions for this period','err'); return; }
+
+  const rows = recs.map(r=>{
+    const dur=fDur(r.ci,r.co);
+    const feeStr=r.free?`<span style="color:#14B8A6;font-weight:700">FREE</span> <span style="color:#6B7280;font-size:12px">Waived ${(r.feeWaived||0).toLocaleString('vi-VN')}₫</span>`
+      :`<span style="color:#F5A623;font-weight:700">${(r.fee||0).toLocaleString('vi-VN')} ₫</span>`;
+    const inPhoto=r.img
+      ?`<img src="${r.img}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`
+      :`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:12px;flex-direction:column;gap:4px"><span style="font-size:24px">📷</span>No photo</div>`;
+    const outPhoto=r.imgOut
+      ?`<img src="${r.imgOut}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`
+      :`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:12px;flex-direction:column;gap:4px"><span style="font-size:24px">📷</span>No photo</div>`;
+    return `
+      <div style="background:#1A1D27;border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:14px;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div>
+            <div style="font-family:monospace;font-size:18px;font-weight:700;letter-spacing:2px;color:#F0F2FF">${r.plate}</div>
+            <div style="font-size:12px;color:#7B82A0;margin-top:2px">${r.vt==='moto'?'🏍️ Motorcycle':'🚗 Car'} · ${dur}</div>
+          </div>
+          <div style="text-align:right">${feeStr}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:#F5A623;background:rgba(245,166,35,.15);padding:2px 8px;border-radius:5px;margin-bottom:5px;display:inline-block">📸 CHECK IN · ${fDate(r.ci)} ${fTime(r.ci)}</div>
+            <div style="width:100%;aspect-ratio:4/3;background:#0F1117;border:1px solid rgba(245,166,35,.3);border-radius:8px;overflow:hidden">${inPhoto}</div>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:#14B8A6;background:rgba(20,184,166,.15);padding:2px 8px;border-radius:5px;margin-bottom:5px;display:inline-block">🚪 CHECK OUT · ${r.co?fDate(r.co)+' '+fTime(r.co):'—'}</div>
+            <div style="width:100%;aspect-ratio:4/3;background:#0F1117;border:1px solid rgba(20,184,166,.3);border-radius:8px;overflow:hidden">${outPhoto}</div>
+          </div>
+        </div>
+        ${r.free&&r.reason?`<div style="margin-top:8px;font-size:12px;color:#14B8A6">Reason: ${r.reason}</div>`:''}
+      </div>`;
+  }).join('');
+
+  let periodLabel='';
+  if(rpMode==='day')   periodLabel=fmtPK(selectedPeriod,'day');
+  if(rpMode==='week')  periodLabel='Week '+fmtPK(selectedPeriod,'week');
+  if(rpMode==='month') periodLabel=fmtPK(selectedPeriod,'month');
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ParkScan Photo Report — ${periodLabel}</title></head>
+<body style="background:#0F1117;color:#F0F2FF;font-family:'Segoe UI',sans-serif;padding:16px;max-width:500px;margin:0 auto">
+  <div style="text-align:center;margin-bottom:20px">
+    <div style="font-size:24px;font-weight:900;letter-spacing:3px;color:#F5A623">PARK<span style="color:#F0F2FF">SCAN</span></div>
+    <div style="font-size:14px;color:#7B82A0;margin-top:4px">Photo Report · ${periodLabel}</div>
+    <div style="font-size:12px;color:#7B82A0">Generated: ${fDT(Date.now())} · ${recs.length} vehicles</div>
+  </div>
+  ${rows}
+</body></html>`;
+
+  const blob=new Blob([html],{type:'text/html'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='ParkScan_Photos_'+periodLabel.replace(/[\/\s–]/g,'-')+'_'+new Date().toISOString().slice(0,10)+'.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('📷 Photo report downloaded','ok');
+}
 // ═══════════════════════════════════════
 let isDark = ls.g('ps_theme','dark') !== 'light';
 function applyTheme(){
@@ -2583,6 +2735,11 @@ setInterval(()=>{
     }
   }
 },12000);
+
+// Hourly auto-backup timer
+setInterval(()=>{
+  if(autoBackupEnabled && role) doAutoBackup();
+}, 3600000); // every 60 minutes
 
 // MODAL CLOSE ON BACKDROP
 ['co-modal','ep-modal','lo-modal'].forEach(id=>{ document.getElementById(id).addEventListener('click',function(e){ if(e.target===this) this.classList.remove('open'); }); });
